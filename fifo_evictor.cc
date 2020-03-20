@@ -14,11 +14,9 @@ void FifoEvictor::touch_key(const key_type& key) {
 }
 const key_type FifoEvictor::evict() {
     key_type last = "";
-    if (contents_.empty() ){
-        return last;
-    } else {
+    if (!contents_.empty() ){
         last = contents_.front();
+        contents_.pop();
     }
-    contents_.pop();
     return last;
 }
