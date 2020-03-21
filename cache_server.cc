@@ -1,9 +1,29 @@
 #include <boost/program_options.hpp>
 
+#include <boost/property_tree/ptree.hpp>
+#include <boost/property_tree/json_parser.hpp>
 #include <iostream>
 #include <string>
 #include <iterator>
 #include "cache.hh"
+#include "evictor.hh"
+
+struct kv_json {
+    key_type key_;
+    Cache::val_type value_;
+    void load(key_type k, Cache::val_type val) {
+        key_ = k;
+        value_ = val;
+    }
+    void write(const std::string &filename) {
+        boost::property_tree::ptree tree;
+        tree.put("key", key_);
+        tree.put("value", value_);
+        boost::property_tree::write_json(filename, tree);
+    }
+};
+
+
 int main(int ac, char* av[])
 {
     try {
@@ -29,6 +49,20 @@ int main(int ac, char* av[])
         std::cout <<"threads: " << vm["threads"].as<int>() << "\n";
 
         Cache c(vm["maxmem"].as<Cache::size_type>());
+        // for get(key):
+            // response<string_body> res;
+            // res.version(11);   // HTTP/1.1
+            // res.result(status::ok);
+            // res.set(field::server, "Beast");
+            // val = c.get(value);
+            // if c == ""
+            // error key not found
+            // else
+            // kv_json json;
+            // json.set(key, val);
+            // json.write("output.json");
+            // res.body() = "output.json";
+            // res.prepare_payload();
     }
     catch(std::exception& e) {
         std::cerr << "error: " << e.what() << "\n";
