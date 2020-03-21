@@ -4,6 +4,45 @@
 #include <string>
 #include <iterator>
 #include "cache.hh"
+
+// Handles an HTTP server connection; based on beast example http code from boost.org
+void do_session(tcp::socket& socket, std::shared_ptr<std::string const> const& doc_root)
+{
+    bool close = false; //Tracking if the connection is closed
+    beast::error_code ec;
+    beast::flat_buffer buffer; //buffer for reading reqs that will persist across reads
+
+    // This lambda is used to send messages(?)
+    send_lambda<tcp::socket> lambda {socket, close, ec};
+
+    while(true)
+    {
+        // Read a request
+        http::request<http::string_body> req;
+        http::read(socket, buffer, req, ec);
+        if(ec == http::error::end_of_stream){
+            break;
+        }
+        if(ec){
+            return fail(ec, "read");
+        }
+
+        // Here we actually hand the stuff; our real work is done here
+        //first want to find out what `req` is
+        //handle_request(*doc_root, std::move(req), lambda);
+
+        if(ec){
+            return fail(ec, "write");
+        }
+        if(close){
+            break;
+        }
+    }
+
+    // shutdown properly after break from close
+    socket.shutdown(tcp::socket::shutdown_send, ec);
+}
+
 int main(int ac, char* av[])
 {
     try {
