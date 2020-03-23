@@ -1,5 +1,5 @@
 CXX=g++-8
-CXXFLAGS=-Wall -Wextra -pedantic -Werror -std=c++17 -O0 -g -I /usr/local/boost_1_72_0/ -L/vagrant/systems/boost/lib
+CXXFLAGS=-Wall -Wextra -pedantic -Werror -std=c++17 -O0 -g -I /usr/local/boost_1_72_0/ -lpthread
 LDFLAGS=$(CXXFLAGS)
 OBJ=$(SRC:.cc=.o)
 
@@ -18,4 +18,4 @@ clean:
 touch:
 	find . -type f -exec touch {} +
 server.bin: cache_lib.o fifo_evictor.o
-	$(CXX) $(LDFLAGS) cache_server.cc -o $@ -l boost_program_options $^
+	$(CXX) $(LDFLAGS) cache_server.cc -o $@ $^ -L/vagrant/systems/boost/lib -lboost_program_options

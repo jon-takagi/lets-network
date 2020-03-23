@@ -28,14 +28,24 @@ struct debug_settings
     void load(const std::string file, const int level, const std::set<std::string> modules);
     void save(const std::string &filename);
 };
-//]
-//[debug_settings_load
+void debug_settings::load(const std::string &filename){
+    pt::ptree tree;
+    pt::read_json(filename, tree);
+    m_file = tree.get<std::string>("debug.filename");
+    m_level = tree.get<int>("debug.level");
+    // Use get_child to find the node containing the modules, and iterate over
+// its children. If the path cannot be resolved, get_child throws.
+// A C++11 for-range loop would also work.
+    BOOST_FOREACH(pt::ptree::value_type &v, tree.get_child("debug.modules")) {
+        // The data function is used to access the data stored in a node.
+        m_modules.insert(v.second.data());
+    }
+}
+
 void debug_settings::load(const std::string file, const int level, const std::set<std::string> modules) {
     m_file = file;
     m_level = level;
     m_modules = modules;
-
-
 }
 //]
 //[debug_settings_save
@@ -51,7 +61,6 @@ void debug_settings::save(const std::string &filename)
     pt::write_json(filename, tree);
 }
 //]
-
 int main()
 {
     try
@@ -63,6 +72,7 @@ int main()
         modules.insert("HR");
         ds.load("example.json", 2, modules);
         ds.save("output.json");
+        ds.load("output.json");
         std::cout << "Success\n";
     }
     catch (std::exception &e)
