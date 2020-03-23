@@ -26,6 +26,7 @@ void process_request(http::request<Body, http::basic_fields<Allocator>>&& req, S
     //-------------------------------------------------------
     //Some lambda nonsense for handling errors
     //Will fiugre this out later
+
     // Returns a bad request response
     auto const bad_request =
     [&req](beast::string_view why)
@@ -163,6 +164,7 @@ void process_request(http::request<Body, http::basic_fields<Allocator>>&& req, S
 
 
         bool key_created = false;
+        //insert in cache
         http::response<string_body> res;
         res.version(11);   // HTTP/1.1
         if(key_created){
