@@ -61,23 +61,9 @@ void handle_request(http::request<Body, http::basic_fields<Allocator>>&& req, Se
 
 {
 
-    //-------------------------------------------------------
-    //Some lambda nonsense for handling errors
-    //Will fiugre this out later
-    // Returns a bad request response
-    auto const bad_request =
-    [&req](beast::string_view why)
-    {
-        http::response<http::string_body> res{http::status::bad_request, req.version()};
-        res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-        res.set(http::field::content_type, "text/html");
-        res.keep_alive(req.keep_alive());
-        res.body() = std::string(why);
-        res.prepare_payload();
-        return res;
-    };
-
-    // Returns a not found response
+    //Lambda for handling errors, borrowed from async beast server example
+    //and changed here to better fit our needs
+    // Returns a not found response; used when GET and POST go wrong
     auto const not_found =
     [&req](beast::string_view target)
     {
@@ -89,58 +75,6 @@ void handle_request(http::request<Body, http::basic_fields<Allocator>>&& req, Se
         res.prepare_payload();
         return res;
     };
-
-    // Returns a server error response
-    // auto const server_error =
-    // [&req](beast::string_view what)
-    // {
-    //     http::response<http::string_body> res{http::status::internal_server_error, req.version()};
-    //     res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-    //     res.set(http::field::content_type, "text/html");
-    //     res.keep_alive(req.keep_alive());
-    //     res.body() = "An error occurred: '" + std::string(what) + "'";
-    //     res.prepare_payload();
-    //     return res;
-    // };
-    //------------------------------------
-
-    // Make sure we can handle the method
-    if( req.method() != http::verb::get &&
-        req.method() != http::verb::head)
-        return send(bad_request("Unknown HTTP-method"));
-
-    // Request path must be absolute and not contain "..".
-    if( req.target().empty() ||
-        req.target()[0] != '/' ||
-        req.target().find("..") != beast::string_view::npos)
-        return send(bad_request("Illegal request-target"));
-
-    // Cache the size since we need it after the move
-    // auto const size = body.size();
-
-    // Respond to HEAD request
-    // if(req.method() == http::verb::head)
-    // {
-    //     http::response<http::empty_body> res{http::status::ok, req.version()};
-    //     res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-    //     res.set(http::field::content_type, mime_type(path));
-    //     res.content_length(size);
-    //     res.keep_alive(req.keep_alive());
-    //     return send(std::move(res));
-    // }
-
-    // Respond to GET request
-    // http::response<http::file_body> res{
-    //     std::piecewise_construct,
-    //     std::make_tuple(std::move(body)),
-    //     std::make_tuple(http::status::ok, req.version())};
-    // res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-    // res.set(http::field::content_type, mime_type(path));
-    // res.content_length(size);
-    // res.keep_alive(req.keep_alive());
-    // return send(std::move(res));
-    //------------------------------------
-    //My code
 
     if(req.method() == http::verb::get)
     {
@@ -184,7 +118,6 @@ void handle_request(http::request<Body, http::basic_fields<Allocator>>&& req, Se
             key_created = true;
         }
         server_cache.set(key, value)
-
         //Now we can create and send the response
         http::response<http::empty_body> res;
         res.set(boost::beast::http::field::content_location, "/" + key_str);
@@ -199,6 +132,7 @@ void handle_request(http::request<Body, http::basic_fields<Allocator>>&& req, Se
         return send(std::move(res));
     }
 
+    //Will send a response for if key was deleted or not found; same effects either way
     if(req.method() == http::verb::delete_) {
         key_type key = std::string(req.target()).substr(1);
         auto success = server_cache.del(key);
@@ -217,22 +151,17 @@ void handle_request(http::request<Body, http::basic_fields<Allocator>>&& req, Se
         res.keep_alive(req.keep_alive());
         res.prepare_payload();
         return send(std::move(res));
-
     }
 
-    //Check with Eitan on this; assignment says return only header but also wants a space-used pair which then must be in the body?
-    //Also check: Accept is supposed to be a request header; also what types go there? don't we want to allow text as well?
     if(req.method() == http::verb::head)
     {
-        http::response<boost::beast::http::string_body> res;
+        http::response<http::empty_body> res;//No body for head response
         res.version(11);   // HTTP/1.1
         res.result(http::status::ok);
         res.set(boost::beast::http::field::server, BOOST_BEAST_VERSION_STRING);
-        res.set(http::field::content_type, "application/json");
-        res.set(http::field::accept, "text/application/json");
-        //add the thing to the body here
-        //add the accept header
-        // res.content_length(size);
+        res.set(boost::beast::http::field::content_type, "application/json");
+        res.set(boost::beast::http::field::accept, "application/json");
+        res.set(boost::beast::http::field::space_used, server_cache.space_used());
         res.keep_alive(req.keep_alive());
         return send(std::move(res));
     }
@@ -241,7 +170,6 @@ void handle_request(http::request<Body, http::basic_fields<Allocator>>&& req, Se
         if(std::string(req.target()) != "/reset"){
             return send(not_found(req.target()));
         }
-
         //Resets the cache and sends back a basic response with string body
         server_cache.reset();
         http::response<boost::beast::http::string_body> res;
@@ -256,7 +184,14 @@ void handle_request(http::request<Body, http::basic_fields<Allocator>>&& req, Se
         return send(std::move(res));
     }
 
-    return send(bad_request("Unknown HTTP-method"));
+    //If request was not one of these methods, return an error
+    http::response<http::string_body> res{http::status::bad_request, req.version()};
+    res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
+    res.set(http::field::content_type, "text/html");
+    res.keep_alive(req.keep_alive());
+    res.body() = std::string("Unknown HHTP Request Method");
+    res.prepare_payload();
+    return res;
 
 }
 
