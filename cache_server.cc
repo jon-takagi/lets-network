@@ -57,8 +57,8 @@ struct bad_args_exception: public std::exception{
 template<
     class Body, class Allocator,
     class Send>
+void handle_request(http::request<Body, http::basic_fields<Allocator>>&& req, Send&& send, Cache* server_cache)
 
-void handle_request(http::request<Body, http::basic_fields<Allocator>>&& req, Send&& send, Cache server_cache)
 {
 
     //Lambda for handling errors, borrowed from async beast server example
@@ -80,7 +80,7 @@ void handle_request(http::request<Body, http::basic_fields<Allocator>>&& req, Se
     {
       key_type key = std::string(req.target()).substr(1); //make a string and slice off the "/"" from the target
       Cache::size_type size;
-      Cache::val_type val = server_cache.get(key, size);
+      Cache::val_type val = server_cache->get(key, size);
       if(strcmp(val, "")){
           return send(not_found(req.target()));
       } else {
@@ -245,17 +245,17 @@ class session : public std::enable_shared_from_this<session>
     http::request<http::string_body> req_;
     std::shared_ptr<void> res_;
     send_lambda lambda_;
-    Cache server_cache_;
+    Cache*server_cache_;
 
 public:
     // Take ownership of the stream
     session(
         tcp::socket&& socket,
-        Cache cache)
+        Cache* cache)
         : stream_(std::move(socket))
         , lambda_(*this)
-        , server_cache_(cache)
     {
+        server_cache_ = cache;
     }
 
     // Start the asynchronous operation
@@ -341,17 +341,17 @@ class listener : public std::enable_shared_from_this<listener>
 {
     net::io_context& ioc_;
     tcp::acceptor acceptor_;
-    Cache server_cache_;
+    Cache* server_cache_;
 
 public:
     listener(
         net::io_context& ioc,
         tcp::endpoint endpoint,
-        Cache cache)
+        Cache* cache)
         : ioc_(ioc)
-        , acceptor_(net::make_strand(ioc)
-        , server_cache_(cache))
+        , acceptor_(net::make_strand(ioc))
     {
+        server_cache_ = cache;
         beast::error_code ec;
 
         // Open the acceptor
@@ -418,7 +418,7 @@ private:
         {
             // Create the session and run it
             std::make_shared<session>(
-                std::move(socket))->run();
+                std::move(socket), server_cache_)->run();
         }
 
         // Accept another connection
@@ -474,10 +474,11 @@ int main(int ac, char* av[])
         Cache server_cache(maxmem);
         boost::asio::io_context ioc{threads};
 
+        Cache* server_cache_p = &server_cache;
         // Create and launch a listening port
         std::make_shared<listener>(
             ioc,
-            tcp::endpoint{server, port}, server_cache)->run();
+            tcp::endpoint{server, port}, server_cache_p)->run();
 
         // Run the I/O service on the requested number of threads
         std::vector<std::thread> v;
