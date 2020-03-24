@@ -18,6 +18,7 @@
 #include <memory>
 #include <thread>
 #include <vector>
+#include <sstream>
 
 namespace beast = boost::beast;         // from <boost/beast.hpp>
 namespace http = beast::http;           // from <boost/beast/http.hpp>
@@ -57,6 +58,7 @@ template<
     class Body, class Allocator,
     class Send>
 void handle_request(http::request<Body, http::basic_fields<Allocator>>&& req, Send&& send, Cache* server_cache)
+
 {
 
     //-------------------------------------------------------
@@ -102,6 +104,11 @@ void handle_request(http::request<Body, http::basic_fields<Allocator>>&& req, Se
     // };
     //------------------------------------
 
+    // Make sure we can handle the method
+    if( req.method() != http::verb::get &&
+        req.method() != http::verb::head)
+        return send(bad_request("Unknown HTTP-method"));
+
     // Request path must be absolute and not contain "..".
     if( req.target().empty() ||
         req.target()[0] != '/' ||
@@ -134,6 +141,7 @@ void handle_request(http::request<Body, http::basic_fields<Allocator>>&& req, Se
     // return send(std::move(res));
     //------------------------------------
     //My code
+
     if(req.method() == http::verb::get)
     {
       key_type key = std::string(req.target()).substr(1); //make a string and slice off the "/"" from the target
@@ -146,10 +154,6 @@ void handle_request(http::request<Body, http::basic_fields<Allocator>>&& req, Se
           res.version(11);   // HTTP/1.1
           res.result(boost::beast::http::status::ok);
           res.set(boost::beast::http::field::server, BOOST_BEAST_VERSION_STRING);
-
-          // kv_json json;
-          // json.set(key, val);
-          // json.write("output.json");
           res.body() = "{ \"key\": " + key + ", \"value\":" + val + "}";
           res.set(boost::beast::http::field::content_type, "json");
           res.content_length(key.length() + size + 19);
@@ -158,26 +162,35 @@ void handle_request(http::request<Body, http::basic_fields<Allocator>>&& req, Se
           return send(std::move(res));
       }
     }
+
+    //Handles a PUT request
+    //Maybe add error checking to ensure the things are of the correct types? or not necessary?
     if(req.method() == http::verb::put)
     {
-        //working on this; do later
-        //res.set(http::field::content_location, /with key here;
-        /*
-        get key and value from target
-        check if key already in Cache; remember This
-        add key to Cache
-        check for errors?
-        create a response
-        set version
-        set content_location
-        set status code based on new key or notify
-        send
-        */
+        //First we extract the key and the value from the request target
+        std::stringstream target_string(std::string(req.target()).substr(1)); //Slice off the first "/" then make a sstream for further slicing
+        std::string key_str;
+        std::string value;
+        std::getline(target_string, key_str, '/')
+        std::getline(target_string, value, '/')
+        //And now we need to convert the value into a char pointer so we can insert into the cache
+        Cache::val_type key = const_cast<char*>(key_str.c_str())
 
-
+        //We then check if the key is already in the Cache (need for status code) and then set the value
         bool key_created = false;
+        Cache::size_type size;
+        Cache::val_type val = server_cache.get(key, size);
+        if(strcmp(val, "")){
+            key_created = true;
+        }
+        server_cache.set(key, value)
+
+        //Now we can create and send the response
+        http::response<http::empty_body> res;
+        res.set(boost::beast::http::field::content_location, "/" + key_str);
         http::response<boost::beast::http::string_body> res;
         res.version(11);   // HTTP/1.1
+        //set the appropriate status code based on if a new entry was created
         if(key_created){
             res.result(201);
         } else {
@@ -185,33 +198,71 @@ void handle_request(http::request<Body, http::basic_fields<Allocator>>&& req, Se
         }
         return send(std::move(res));
     }
+
     if(req.method() == http::verb::delete_) {
-        // do delete-y stuff
+        key_type key = std::string(req.target()).substr(1);
+        auto success = server_cache.del(key);
+        http::response<boost::beast::http::string_body> res;
+        res.version(11);   // HTTP/1.1
+        res.result(boost::beast::http::status::ok);
+        res.set(boost::beast::http::field::server, BOOST_BEAST_VERSION_STRING);
+        if(success){
+            res.body() = "The key " + key + " was deleted from the cache";
+            res.content_length(key.length() + 36);
+        } else {
+            res.body() = "The key " + key + " was not found in the cache";
+            res.content_length(key.length() + 36);
+        }
+        res.set(boost::beast::http::field::content_type, "text");
+        res.keep_alive(req.keep_alive());
+        res.prepare_payload();
+        return send(std::move(res));
+
     }
 
     //Check with Eitan on this; assignment says return only header but also wants a space-used pair which then must be in the body?
     //Also check: Accept is supposed to be a request header; also what types go there? don't we want to allow text as well?
     if(req.method() == http::verb::head)
     {
-      http::response<boost::beast::http::string_body> res;
-      res.version(11);   // HTTP/1.1
-      res.result(http::status::ok);
-      res.set(boost::beast::http::field::server, BOOST_BEAST_VERSION_STRING);
-      res.set(http::field::content_type, "application/json");
-      res.set(http::field::accept, "text/application/json");
-      //add the thing to the body here
-      //add the accept header
-      // res.content_length(size);
-      res.keep_alive(req.keep_alive());
-      return send(std::move(res));
+        http::response<boost::beast::http::string_body> res;
+        res.version(11);   // HTTP/1.1
+        res.result(http::status::ok);
+        res.set(boost::beast::http::field::server, BOOST_BEAST_VERSION_STRING);
+        res.set(http::field::content_type, "application/json");
+        res.set(http::field::accept, "text/application/json");
+        //add the thing to the body here
+        //add the accept header
+        // res.content_length(size);
+        res.keep_alive(req.keep_alive());
+        return send(std::move(res));
     }
 
     if(req.method() == http::verb::post) {
-        //do POSTy stuff
+        if(std::string(req.target()) != "/reset"){
+            return send(not_found(req.target()));
+        }
+
+        //Resets the cache and sends back a basic response with string body
+        server_cache.reset();
+        http::response<boost::beast::http::string_body> res;
+        res.version(11);   // HTTP/1.1
+        res.result(boost::beast::http::status::ok);
+        res.set(boost::beast::http::field::server, BOOST_BEAST_VERSION_STRING);
+        res.body() = "The Cache has been reset";
+        res.set(boost::beast::http::field::content_type, "text");
+        res.content_length(25);//counting null terminator
+        res.keep_alive(req.keep_alive());
+        res.prepare_payload();
+        return send(std::move(res));
     }
+
     return send(bad_request("Unknown HTTP-method"));
 
 }
+
+
+
+
 
 // Handles an HTTP server connection
 class session : public std::enable_shared_from_this<session>
