@@ -58,8 +58,27 @@ template<
     class Body, class Allocator,
     class Send>
 void handle_request(http::request<Body, http::basic_fields<Allocator>>&& req, Send&& send, Cache* server_cache)
-
 {
+
+    http::response<http::string_body> res{ http::status::bad_request, req.version()};
+    res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
+    res.set(http::field::content_type, "text/html");
+    res.keep_alive(req.keep_alive());
+    res.body() = std::string("Unknown HHTP Request Method");
+    res.prepare_payload();
+    return res;
+    auto const bad_request =
+    [&req](beast::string_view why)
+    {
+        http::response<http::string_body> res{http::status::bad_request, req.version()};
+        res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
+        res.set(http::field::content_type, "text/html");
+        res.keep_alive(req.keep_alive());
+        res.body() = std::string(why);
+        res.prepare_payload();
+        return res;
+    };
+
 
     //Lambda for handling errors, borrowed from async beast server example
     //and changed here to better fit our needs
@@ -75,6 +94,12 @@ void handle_request(http::request<Body, http::basic_fields<Allocator>>&& req, Se
         res.prepare_payload();
         return res;
     };
+    if( req.method() != http::verb::get &&
+        req.method() != http::verb::put &&
+        req.method() != http::verb::delete_ &&
+        req.method() != http::verb::head &&
+        req.method() != http::verb::post)
+        return send(bad_request("Unknown HTTP-method"));
 
     if(req.method() == http::verb::get)
     {
@@ -104,30 +129,30 @@ void handle_request(http::request<Body, http::basic_fields<Allocator>>&& req, Se
         //First we extract the key and the value from the request target
         std::stringstream target_string(std::string(req.target()).substr(1)); //Slice off the first "/" then make a sstream for further slicing
         std::string key_str;
-        std::string value;
-        std::getline(target_string, key_str, '/')
-        std::getline(target_string, value, '/')
+        std::string val_str;
+        std::getline(target_string, key_str, '/');
+        std::getline(target_string, val_str, '/');
         //And now we need to convert the value into a char pointer so we can insert into the cache
-        Cache::val_type key = const_cast<char*>(key_str.c_str())
+        key_type key = key_str;
+        Cache::val_type val = const_cast<char*>(val_str.c_str()) ;
 
         //We then check if the key is already in the Cache (need for status code) and then set the value
         bool key_created = false;
         Cache::size_type size;
-        Cache::val_type val = server_cache.get(key, size);
-        if(strcmp(val, "")){
+        if(strcmp(server_cache->get(key_str, size), "")){
             key_created = true;
+             size = val_str.length();
         }
-        server_cache.set(key, value)
+        server_cache->set(key, val, size);
         //Now we can create and send the response
-        http::response<http::empty_body> res;
-        res.set(boost::beast::http::field::content_location, "/" + key_str);
         http::response<boost::beast::http::string_body> res;
+        res.set(boost::beast::http::field::content_location, "/" + key_str);
         res.version(11);   // HTTP/1.1
         //set the appropriate status code based on if a new entry was created
         if(key_created){
             res.result(201);
         } else {
-          res.result(204);
+            res.result(204);
         }
         return send(std::move(res));
     }
@@ -135,7 +160,7 @@ void handle_request(http::request<Body, http::basic_fields<Allocator>>&& req, Se
     //Will send a response for if key was deleted or not found; same effects either way
     if(req.method() == http::verb::delete_) {
         key_type key = std::string(req.target()).substr(1);
-        auto success = server_cache.del(key);
+        auto success = server_cache->del(key);
         http::response<boost::beast::http::string_body> res;
         res.version(11);   // HTTP/1.1
         res.result(boost::beast::http::status::ok);
@@ -161,7 +186,7 @@ void handle_request(http::request<Body, http::basic_fields<Allocator>>&& req, Se
         res.set(boost::beast::http::field::server, BOOST_BEAST_VERSION_STRING);
         res.set(boost::beast::http::field::content_type, "application/json");
         res.set(boost::beast::http::field::accept, "application/json");
-        res.set(boost::beast::http::field::space_used, server_cache.space_used());
+        res.content_length(server_cache->space_used());
         res.keep_alive(req.keep_alive());
         return send(std::move(res));
     }
@@ -171,7 +196,7 @@ void handle_request(http::request<Body, http::basic_fields<Allocator>>&& req, Se
             return send(not_found(req.target()));
         }
         //Resets the cache and sends back a basic response with string body
-        server_cache.reset();
+        server_cache->reset();
         http::response<boost::beast::http::string_body> res;
         res.version(11);   // HTTP/1.1
         res.result(boost::beast::http::status::ok);
@@ -185,13 +210,6 @@ void handle_request(http::request<Body, http::basic_fields<Allocator>>&& req, Se
     }
 
     //If request was not one of these methods, return an error
-    http::response<http::string_body> res{http::status::bad_request, req.version()};
-    res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-    res.set(http::field::content_type, "text/html");
-    res.keep_alive(req.keep_alive());
-    res.body() = std::string("Unknown HHTP Request Method");
-    res.prepare_payload();
-    return res;
 
 }
 

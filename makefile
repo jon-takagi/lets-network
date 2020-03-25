@@ -19,3 +19,6 @@ touch:
 	find . -type f -exec touch {} +
 server.bin: cache_lib.o fifo_evictor.o
 	$(CXX) $(LDFLAGS) cache_server.cc -o $@ $^ -L/vagrant/systems/boost/lib -lboost_program_options
+
+ex_serv.bin: cache_lib.o fifo_evictor.o
+	$(CXX) $(LDFLAGS) example_server.cc -o $@ $^ -L/vagrant/systems/boost/lib -lboost_program_options
