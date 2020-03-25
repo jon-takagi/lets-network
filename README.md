@@ -3,8 +3,8 @@
 ## TCP Server
 
 ### Building
-I installed boost into `/usr/local/boost_1_72_0`, then used bootstrap to make a copy in `/vagrant/systems/boost`. In our makefile, these are included in lines 2 and 21. If you install boost elsewhere, or don't use the VM provided by Eitan, then change these lines. Finally, after `make`ing our source files, ensure the library can be found at runtime by adding the copy you made with bootstrap to your `LD_LIBRARY_PATH`.
+I installed boost into `/usr/local/boost_1_72_0`, then used bootstrap to make a copy in `/vagrant/systems/boost`. In our makefile, these are included in lines 2 and 21. If you install boost elsewhere, or don't use the VM provided by Eitan, then change these lines.
 
-The command we used was `export LD_LIBRARY_PATH=/vagrant/systems/boost:$LD_LIBRARY_PATH`
+Note that in our makefile we only specify `program_options` to the linker. This is because the other boost libraries we used are "header only" and there is no library archive to link to the compiler, simply using the `-I` flag to point to the header is sufficient.
 
 ## TCP Client
