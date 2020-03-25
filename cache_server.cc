@@ -54,19 +54,11 @@ struct bad_args_exception: public std::exception{
     }
 };
 
-template<
-    class Body, class Allocator,
-    class Send>
+
+//Template function since we may have different types of requests passed in
+template< class Body, class Allocator,class Send>
 void handle_request(http::request<Body, http::basic_fields<Allocator>>&& req, Send&& send, Cache* server_cache)
 {
-
-    http::response<http::string_body> res{ http::status::bad_request, req.version()};
-    res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-    res.set(http::field::content_type, "text/html");
-    res.keep_alive(req.keep_alive());
-    res.body() = std::string("Unknown HHTP Request Method");
-    res.prepare_payload();
-    return res;
     auto const bad_request =
     [&req](beast::string_view why)
     {
@@ -208,8 +200,13 @@ void handle_request(http::request<Body, http::basic_fields<Allocator>>&& req, Se
         res.prepare_payload();
         return send(std::move(res));
     }
-
-    //If request was not one of these methods, return an error
+    http::response<http::string_body> res{http::status::bad_request, req.version()};
+    res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
+    res.set(http::field::content_type, "text/html");
+    res.keep_alive(req.keep_alive());
+    res.body() = std::string("Unknown HHTP Request Method");
+    res.prepare_payload();
+    return send(std::move(res));
 
 }
 
