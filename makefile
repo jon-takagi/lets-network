@@ -5,7 +5,7 @@ OBJ=$(SRC:.cc=.o)
 
 all: server.bin client.bin
 
-main.bin: cache_lib.o test_cache_lib.o fifo_evictor.o
+test.bin: cache_lib.o test_cache_lib.o fifo_evictor.o
 	$(CXX) $(LDFLAGS) -o $@ $^
 
 %.o: %.cc %.hh
@@ -19,4 +19,6 @@ touch:
 	find . -type f -exec touch {} +
 server.bin: cache_lib.o fifo_evictor.o
 	$(CXX) $(LDFLAGS) cache_server.cc -o $@ $^ /vagrant/systems/boost/lib/libboost_program_options.a
-client.bin: 
+client.bin:
+echo_serv.bin: cache_lib.o fifo_evictor.o
+	$(CXX) $(LDFLAGS) echo_serv.cc -o $@ $^ /vagrant/systems/boost/lib/libboost_program_options.a
