@@ -430,16 +430,12 @@ public:
     }
 
     // Start accepting incoming connections
-    void
-    run()
-    {
+    void run() {
         do_accept();
     }
 
 private:
-    void
-    do_accept()
-    {
+    void do_accept() {
         // The new connection gets its own strand
         acceptor_.async_accept(
             net::make_strand(ioc_),
@@ -448,9 +444,7 @@ private:
                 shared_from_this()));
     }
 
-    void
-    on_accept(beast::error_code ec, tcp::socket socket)
-    {
+    void on_accept(beast::error_code ec, tcp::socket socket) {
         if(ec)
         {
             fail(ec, "accept");
@@ -481,7 +475,6 @@ int main(int ac, char* av[])
         boost::program_options::variables_map vm;
         boost::program_options::store(boost::program_options::parse_command_line(ac, av, desc), vm);
         boost::program_options::notify(vm);
-//
         if (vm.count("help")) {
             std::cout << desc << "\n";
             return 0;
@@ -495,20 +488,6 @@ int main(int ac, char* av[])
         std::cout << "port: " << port << "\n";
         std::cout << "server: " << server<< "\n";
         std::cout <<"threads: " << threads << "\n";
-//         // for get(key):
-//             // response<string_body> res;
-//             // res.version(11);   // HTTP/1.1
-//             // res.result(status::ok);
-//             // res.set(field::server, "Beast");
-//             // val = c.get(value);
-//             // if c == ""
-//             // error key not found
-//             // else
-//             // kv_json json;
-//             // json.set(key, val);
-//             // json.write("output.json");
-//             // res.body() = "output.json";
-//             // res.prepare_payload();
         if(threads < 0) {
             throw bad_args_exception();
         }
@@ -516,12 +495,10 @@ int main(int ac, char* av[])
         boost::asio::io_context ioc{threads};
 
         Cache* server_cache_p = &server_cache;
-        // Create and launch a listening port
         std::make_shared<listener>(
             ioc,
             tcp::endpoint{server, port}, server_cache_p)->run();
 
-        // Run the I/O service on the requested number of threads
         std::vector<std::thread> v;
         v.reserve(threads - 1);
         for(auto i = threads - 1; i > 0; --i)
