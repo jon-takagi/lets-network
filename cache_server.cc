@@ -56,7 +56,7 @@ struct bad_args_exception: public std::exception{
 
 
 //Template function since we may have different types of requests passed in
-template<class Body, class Allocator, class Send>
+template <class Body, class Allocator, class Send>
 void handle_request(http::request<Body, http::basic_fields<Allocator>>&& req, Send&& send, Cache* server_cache)
 {
     auto const server_error =

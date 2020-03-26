@@ -17,29 +17,29 @@ using tcp = net::ip::tcp;           // from <boost/asio/ip/tcp.hpp>
 class Cache::Impl {
 public:
     std::string host_;
-    int port_;
-    tcp::resolver resolver_;
+    std::string port_;
     beast::tcp_stream stream_;
 };
 
-Cache::Cache(std::string host, std::string port) : pImpl_(new Impl()) {
+Cache::Cache(std::string host, std::string port) : pImpl_(new Impl()){
     pImpl_->host_ = host;
-    pImpl_->port_ = std::stoi(port);
+    pImpl_->port_ = port;
     net::io_context ioc;
-    pImpl_->resolver_(ioc);
+    tcp::resolver resolver(ioc);
     pImpl_->stream_(ioc);
+    auto const results = resolver.resolve(host, port);
+    pImpl_->stream_.connect(results)
 }
 Cache::~Cache() {
     reset();
-}
-
-int main() {
-    Cache c("127.0.0.1", "42069");
-    // c.del("blah");
-    return 0;
+    beast::error_code ec;
+    pImpl_->stream_.socket().shutdown(tcp::socket::shutdown_both, ec);
+    if(ec && ec != beast::errc::not_connected)
+        throw beast::system_error{ec};
 }
 
 void Cache::set(key_type key, val_type val, size_type size) {
+    std::cout << key << ": " << val << "; " << size << std::endl;
     // PUT /key/val
     http::request<http::string_body> req;
     req.method(http::verb::put);
@@ -94,31 +94,30 @@ bool Cache::del(key_type key) {
     //else
     return true;
 }
-Cache::size_type Cache::space_used() {
-    http::request<http::string_body> req{http::verb::head};
+Cache::size_type Cache::space_used() const{
+
+    http::request<http::string_body> req;
+    req.method(http::verb::head);
     req.target("/");
     req.version(11);
     req.set(http::field::host, pImpl_->host_);
     req.set(http::field::user_agent, BOOST_BEAST_VERSION_STRING);
-    try{
-        auto const results = resolver.resolve(pImpl_->host_, pImpl_->port_);
-        stream.connect(results);
-        http::write(stream, req);
+
+    try
+    {
+
+        http::write(pImpl_->stream_, req);
         beast::flat_buffer buffer;
         http::response<http::dynamic_body> res;
-        http::read(stream, buffer, res);
+        http::read(pImpl_->stream_, buffer, res);
         std::cout << res << std::endl;
-        beast::error_code ec;
-        stream.socket().shutdown(tcp::socket::shutdown_both, ec);
-        if(ec && ec != beast::errc::not_connected)
-            throw beast::system_error{ec};
     }
-    catch(std::exception const& e){
+    catch(std::exception const& e)
+    {
         std::cerr << "Error: " << e.what() << std::endl;
         return EXIT_FAILURE;
     }
-//HEAD
-return 0;
+    return 0;
 }
 void Cache::reset() {
     // POST /reset
@@ -144,4 +143,10 @@ void Cache::reset() {
         std::cerr << "Error: " << e.what() << std::endl;
         return EXIT_FAILURE;
     }
+}
+
+int main() {
+    Cache c("127.0.0.1", "42069");
+    c.space_used();
+    return 0;
 }

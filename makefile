@@ -18,7 +18,8 @@ clean:
 touch:
 	find . -type f -exec touch {} +
 server.bin: cache_lib.o fifo_evictor.o
-	$(CXX) $(LDFLAGS) cache_server.cc -o $@ $^ /usr/local/boost_1_72_0/ehpop/Documents/lib/libboost_program_options.a
-
+	$(CXX) $(LDFLAGS) cache_server.cc -o $@ $^ /vagrant/systems/boost/lib/libboost_program_options.a
+client.bin:
+	$(CXX) $(LDFLAGS) cache_client.cc -o $@ 
 echo_serv.bin: cache_lib.o fifo_evictor.o
 	$(CXX) $(LDFLAGS) echo_serv.cc -o $@ $^ /usr/local/boost_1_72_0/ehpop/Documents/lib/libboost_program_options.a
