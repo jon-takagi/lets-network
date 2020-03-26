@@ -143,7 +143,7 @@ void handle_request(http::request<Body, http::basic_fields<Allocator>>&& req, Se
         std::getline(target_string, val_str, '/');
         //And now we need to convert the value into a char pointer so we can insert into the cache
         key_type key = key_str;
-        Cache::val_type val = const_cast<char*>(val_str.c_str()) ;
+        Cache::val_type val = const_cast<char*>(val_str.c_str());
         bool key_created = false;
         Cache::size_type size = 0;
         //We then check if the key is already in the Cache (need for status code) and then set the value
