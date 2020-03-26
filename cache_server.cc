@@ -54,10 +54,34 @@ struct bad_args_exception: public std::exception{
     }
 };
 
+
 //Template function since we may have different types of requests passed in
-template<class Body, class Allocator, class Send>
+template< class Body, class Allocator,class Send
 void handle_request(http::request<Body, http::basic_fields<Allocator>>&& req, Send&& send, Cache* server_cache)
 {
+    auto const server_error =
+    [&req](beast::string_view what)
+    {
+        http::response<http::string_body> res{http::status::internal_server_error, req.version()};
+        res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
+        res.set(http::field::content_type, "text/html");
+        res.keep_alive(req.keep_alive());
+        res.body() = "An error occurred: '" + std::string(what) + "'";
+        res.prepare_payload();
+        return res;
+    };
+    auto const bad_request =
+    [&req](beast::string_view why)
+    {
+        http::response<http::string_body> res{http::status::bad_request, req.version()};
+        res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
+        res.set(http::field::content_type, "text/html");
+        res.keep_alive(req.keep_alive());
+        res.body() = std::string(why);
+        res.prepare_payload();
+        return res;
+    };
+
 
     //Lambda for handling errors, borrowed from async beast server example
     //and changed here to better fit our needs
@@ -69,18 +93,29 @@ void handle_request(http::request<Body, http::basic_fields<Allocator>>&& req, Se
         res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
         res.set(http::field::content_type, "text/html");
         res.keep_alive(req.keep_alive());
-        res.body() = "The resource '" + std::string(target) + "' was not found.";
+        res.body() = "The resource '" + std::string(target) + "' was not found.\n";
         res.prepare_payload();
         return res;
     };
+    if( req.method() != http::verb::get &&
+        req.method() != http::verb::put &&
+        req.method() != http::verb::delete_ &&
+        req.method() != http::verb::head &&
+        req.method() != http::verb::post)
+        return send(bad_request("Unknown HTTP-method"));
 
     if(req.method() == http::verb::get)
     {
       key_type key = std::string(req.target()).substr(1); //make a string and slice off the "/"" from the target
       Cache::size_type size;
+      std::cout << "getting..." << key << std::endl;
       Cache::val_type val = server_cache->get(key, size);
-      if(strcmp(val, "")){
-          return send(not_found(req.target()));
+      std::cout << "cache["<<key<<"]=" << val << std::endl;
+      std::cout << server_cache->get("key_one", size) << std::endl;
+
+      std::cout << server_cache->space_used() << std::endl;
+      if(server_cache->get(key, size) == nullptr){
+          return send(not_found(key));
       } else {
           http::response<boost::beast::http::string_body> res;
           res.version(11);   // HTTP/1.1
@@ -100,34 +135,41 @@ void handle_request(http::request<Body, http::basic_fields<Allocator>>&& req, Se
     if(req.method() == http::verb::put)
     {
         //First we extract the key and the value from the request target
+        std::cout << "target: " << req.target() << std::endl << std::endl;
         std::stringstream target_string(std::string(req.target()).substr(1)); //Slice off the first "/" then make a sstream for further slicing
-        std::string key;
+        std::string key_str;
         std::string val_str;
-        std::getline(target_string, key, '/');
+        std::getline(target_string, key_str, '/');
         std::getline(target_string, val_str, '/');
         //And now we need to convert the value into a char pointer so we can insert into the cache
-        Cache::size_type size = val_str.size();
-        Cache::val_type val = const_cast<char*>(val_str.c_str());
-
-        //We then check if the key is already in the Cache (need for status code) and then set the value
+        key_type key = key_str;
+        Cache::val_type val = const_cast<char*>(val_str.c_str()) ;
         bool key_created = false;
-        Cache::size_type size_check;
-        Cache::val_type val_check = server_cache->get(key, size_check);
-        if(strcmp(val_check, "")){
+        Cache::size_type size = 0;
+        //We then check if the key is already in the Cache (need for status code) and then set the value
+        if(server_cache->get(key_str, size) == nullptr){
             key_created = true;
+            size = val_str.length()+1;
         }
-
-        server_cache->set(key, val, size);//Need to fix val here; make a pointer
+        std::cout << "setting...";
+        server_cache->set(key, val, size);
+        if(server_cache -> get(key, size)[0] == '\0') {
+            std::cout << "\n error." << std::endl;
+            return send(server_error("auuuuuugh"));
+        } else {
+            std::cout <<"done" << std::endl;
+        }
         //Now we can create and send the response
-        http::response<http::empty_body> res;
-        res.set(boost::beast::http::field::content_location, "/" + key);
+        http::response<boost::beast::http::string_body> res;
+        res.set(boost::beast::http::field::content_location, "/" + key_str);
         res.version(11);   // HTTP/1.1
         //set the appropriate status code based on if a new entry was created
         if(key_created){
             res.result(201);
         } else {
-          res.result(204);
+            res.result(204);
         }
+        std::cout << "cache[" << key << "] now equals: " << server_cache -> get(key, size);
         return send(std::move(res));
     }
 
@@ -140,10 +182,10 @@ void handle_request(http::request<Body, http::basic_fields<Allocator>>&& req, Se
         res.result(boost::beast::http::status::ok);
         res.set(boost::beast::http::field::server, BOOST_BEAST_VERSION_STRING);
         if(success){
-            res.body() = "The key " + key + " was deleted from the cache";
+            res.body() = "The key " + key + " was deleted from the cache\n";
             res.content_length(key.length() + 36);
         } else {
-            res.body() = "The key " + key + " was not found in the cache";
+            res.body() = "The key " + key + " was not found in the cache\n";
             res.content_length(key.length() + 36);
         }
         res.set(boost::beast::http::field::content_type, "text");
@@ -161,7 +203,6 @@ void handle_request(http::request<Body, http::basic_fields<Allocator>>&& req, Se
         res.set(boost::beast::http::field::content_type, "application/json");
         res.set(boost::beast::http::field::accept, "application/json");
         res.insert("Space-Used", server_cache->space_used());
-        //res["Space-Used"] = std::to_string(server_cache->space_used());
         res.keep_alive(req.keep_alive());
         return send(std::move(res));
     }
@@ -183,8 +224,6 @@ void handle_request(http::request<Body, http::basic_fields<Allocator>>&& req, Se
         res.prepare_payload();
         return send(std::move(res));
     }
-
-    //If request was not one of these methods, return an error
     http::response<http::string_body> res{http::status::bad_request, req.version()};
     res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
     res.set(http::field::content_type, "text/html");
@@ -389,16 +428,12 @@ public:
     }
 
     // Start accepting incoming connections
-    void
-    run()
-    {
+    void run() {
         do_accept();
     }
 
 private:
-    void
-    do_accept()
-    {
+    void do_accept() {
         // The new connection gets its own strand
         acceptor_.async_accept(
             net::make_strand(ioc_),
@@ -407,9 +442,7 @@ private:
                 shared_from_this()));
     }
 
-    void
-    on_accept(beast::error_code ec, tcp::socket socket)
-    {
+    void on_accept(beast::error_code ec, tcp::socket socket) {
         if(ec)
         {
             fail(ec, "accept");
@@ -440,7 +473,6 @@ int main(int ac, char* av[])
         boost::program_options::variables_map vm;
         boost::program_options::store(boost::program_options::parse_command_line(ac, av, desc), vm);
         boost::program_options::notify(vm);
-//
         if (vm.count("help")) {
             std::cout << desc << "\n";
             return 0;
@@ -454,20 +486,6 @@ int main(int ac, char* av[])
         std::cout << "port: " << port << "\n";
         std::cout << "server: " << server<< "\n";
         std::cout <<"threads: " << threads << "\n";
-//         // for get(key):
-//             // response<string_body> res;
-//             // res.version(11);   // HTTP/1.1
-//             // res.result(status::ok);
-//             // res.set(field::server, "Beast");
-//             // val = c.get(value);
-//             // if c == ""
-//             // error key not found
-//             // else
-//             // kv_json json;
-//             // json.set(key, val);
-//             // json.write("output.json");
-//             // res.body() = "output.json";
-//             // res.prepare_payload();
         if(threads < 0) {
             throw bad_args_exception();
         }
@@ -475,12 +493,10 @@ int main(int ac, char* av[])
         boost::asio::io_context ioc{threads};
 
         Cache* server_cache_p = &server_cache;
-        // Create and launch a listening port
         std::make_shared<listener>(
             ioc,
             tcp::endpoint{server, port}, server_cache_p)->run();
 
-        // Run the I/O service on the requested number of threads
         std::vector<std::thread> v;
         v.reserve(threads - 1);
         for(auto i = threads - 1; i > 0; --i)
