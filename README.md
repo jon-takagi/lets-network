@@ -1,11 +1,6 @@
 # TODO:
 
-1. why doesnt `PUT` work
-2.
-
-
-
-
+1. skeleton of cache_client complete, I will do `reset`, `space_used` and `del` if you do `set` and `get`
 
 ## Changes from HW 2
 
