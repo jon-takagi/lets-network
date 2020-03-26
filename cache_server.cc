@@ -108,11 +108,13 @@ void handle_request(http::request<Body, http::basic_fields<Allocator>>&& req, Se
     {
       key_type key = std::string(req.target()).substr(1); //make a string and slice off the "/"" from the target
       Cache::size_type size;
-      Cache::val_type val = server_cache->get(key, size);
       std::cout << "getting..." << key << std::endl;
+      Cache::val_type val = server_cache->get(key, size);
       std::cout << "cache["<<key<<"]=" << val << std::endl;
       std::cout << server_cache->get("key_one", size) << std::endl;
-      if(server_cache->get(key, size)[0] == '\0'){
+
+      std::cout << server_cache->space_used() << std::endl;
+      if(server_cache->get(key, size) == nullptr){
           return send(not_found(key));
       } else {
           http::response<boost::beast::http::string_body> res;
@@ -146,13 +148,19 @@ void handle_request(http::request<Body, http::basic_fields<Allocator>>&& req, Se
         Cache::size_type size = 0;
         //We then check if the key is already in the Cache (need for status code) and then set the value
 
-        if(server_cache->get(key_str, size)[0] == '\0'){
+        if(server_cache->get(key_str, size) == nullptr){
             key_created = true;
-            size = val_str.length();
+            size = val_str.length()+1;
         }
         std::cout << "setting...";
         server_cache->set(key, val, size);
-        std::cout <<"done" << std::endl;
+        if(server_cache -> get(key, size)[0] == '\0') {
+            std::cout << "\n error." << std::endl;
+            return send(server_error("auuuuuugh"));
+        } else {
+            std::cout <<"done" << std::endl;
+        }
+
         //Now we can create and send the response
         http::response<boost::beast::http::string_body> res;
         res.set(boost::beast::http::field::content_location, "/" + key_str);
@@ -162,9 +170,6 @@ void handle_request(http::request<Body, http::basic_fields<Allocator>>&& req, Se
             res.result(201);
         } else {
             res.result(204);
-        }
-        if(server_cache -> get(key, size)[0] == '\0') {
-            return send(server_error("auuuuuugh"));
         }
         std::cout << "cache[" << key << "] now equals: " << server_cache -> get(key, size);
         return send(std::move(res));
@@ -179,10 +184,10 @@ void handle_request(http::request<Body, http::basic_fields<Allocator>>&& req, Se
         res.result(boost::beast::http::status::ok);
         res.set(boost::beast::http::field::server, BOOST_BEAST_VERSION_STRING);
         if(success){
-            res.body() = "The key " + key + " was deleted from the cache";
+            res.body() = "The key " + key + " was deleted from the cache\n";
             res.content_length(key.length() + 36);
         } else {
-            res.body() = "The key " + key + " was not found in the cache";
+            res.body() = "The key " + key + " was not found in the cache\n";
             res.content_length(key.length() + 36);
         }
         res.set(boost::beast::http::field::content_type, "text");
@@ -511,6 +516,7 @@ int main(int ac, char* av[])
         boost::asio::io_context ioc{threads};
 
         Cache* server_cache_p = &server_cache;
+        server_cache_p->set("key_one", "val_one", 8);
         // Create and launch a listening port
         std::make_shared<listener>(
             ioc,
