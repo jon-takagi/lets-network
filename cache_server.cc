@@ -112,6 +112,8 @@ void handle_request(http::request<Body, http::basic_fields<Allocator>>&& req, Se
       std::cout << "getting..." << key << std::endl;
       std::cout << "cache["<<key<<"]=" << val << std::endl;
       std::cout << server_cache->get("key_one", size) << std::endl;
+
+      std::cout << server_cache->space_used() << std::endl;
       if(server_cache->get(key, size)[0] == '\0'){
           return send(not_found(key));
       } else {
@@ -152,7 +154,13 @@ void handle_request(http::request<Body, http::basic_fields<Allocator>>&& req, Se
         }
         std::cout << "setting...";
         server_cache->set(key, val, size);
-        std::cout <<"done" << std::endl;
+        if(server_cache -> get(key, size)[0] == '\0') {
+            std::cout << "\n error." << std::endl;
+            return send(server_error("auuuuuugh"));
+        } else {
+            std::cout <<"done" << std::endl;
+        }
+
         //Now we can create and send the response
         http::response<boost::beast::http::string_body> res;
         res.set(boost::beast::http::field::content_location, "/" + key_str);
@@ -162,9 +170,6 @@ void handle_request(http::request<Body, http::basic_fields<Allocator>>&& req, Se
             res.result(201);
         } else {
             res.result(204);
-        }
-        if(server_cache -> get(key, size)[0] == '\0') {
-            return send(server_error("auuuuuugh"));
         }
         std::cout << "cache[" << key << "] now equals: " << server_cache -> get(key, size);
         return send(std::move(res));
@@ -511,6 +516,7 @@ int main(int ac, char* av[])
         boost::asio::io_context ioc{threads};
 
         Cache* server_cache_p = &server_cache;
+        server_cache_p->set("key_one", "val_one", 8);
         // Create and launch a listening port
         std::make_shared<listener>(
             ioc,

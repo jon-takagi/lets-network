@@ -1,6 +1,6 @@
 # TODO:
 
-1. segfaults on a get request for a bad key
+1. why doesnt `PUT` work
 2.
 
 
