@@ -13,6 +13,9 @@ class Cache::Impl{
         size_type maxmem_;
         Evictor* evictor_;
 };
+Cache::Cache(std::string host, std::string port) {
+    
+}
 
 Cache::Cache(size_type maxmem,float max_load_factor, Evictor* evictor, hash_func hasher)
  : pImpl_(new Impl()) {

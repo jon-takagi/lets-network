@@ -516,7 +516,6 @@ int main(int ac, char* av[])
         boost::asio::io_context ioc{threads};
 
         Cache* server_cache_p = &server_cache;
-        server_cache_p->set("key_one", "val_one", 8);
         // Create and launch a listening port
         std::make_shared<listener>(
             ioc,
