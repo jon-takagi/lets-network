@@ -108,13 +108,13 @@ void handle_request(http::request<Body, http::basic_fields<Allocator>>&& req, Se
     {
       key_type key = std::string(req.target()).substr(1); //make a string and slice off the "/"" from the target
       Cache::size_type size;
-      Cache::val_type val = server_cache->get(key, size);
       std::cout << "getting..." << key << std::endl;
+      Cache::val_type val = server_cache->get(key, size);
       std::cout << "cache["<<key<<"]=" << val << std::endl;
       std::cout << server_cache->get("key_one", size) << std::endl;
 
       std::cout << server_cache->space_used() << std::endl;
-      if(server_cache->get(key, size)[0] == '\0'){
+      if(server_cache->get(key, size) == nullptr){
           return send(not_found(key));
       } else {
           http::response<boost::beast::http::string_body> res;
@@ -148,9 +148,9 @@ void handle_request(http::request<Body, http::basic_fields<Allocator>>&& req, Se
         Cache::size_type size = 0;
         //We then check if the key is already in the Cache (need for status code) and then set the value
 
-        if(server_cache->get(key_str, size)[0] == '\0'){
+        if(server_cache->get(key_str, size) == nullptr){
             key_created = true;
-            size = val_str.length();
+            size = val_str.length()+1;
         }
         std::cout << "setting...";
         server_cache->set(key, val, size);
@@ -184,10 +184,10 @@ void handle_request(http::request<Body, http::basic_fields<Allocator>>&& req, Se
         res.result(boost::beast::http::status::ok);
         res.set(boost::beast::http::field::server, BOOST_BEAST_VERSION_STRING);
         if(success){
-            res.body() = "The key " + key + " was deleted from the cache";
+            res.body() = "The key " + key + " was deleted from the cache\n";
             res.content_length(key.length() + 36);
         } else {
-            res.body() = "The key " + key + " was not found in the cache";
+            res.body() = "The key " + key + " was not found in the cache\n";
             res.content_length(key.length() + 36);
         }
         res.set(boost::beast::http::field::content_type, "text");
