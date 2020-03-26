@@ -192,15 +192,24 @@ handle_request(
     }
 
     // Respond to GET request
-    http::response<http::file_body> res{
-        std::piecewise_construct,
-        std::make_tuple(std::move(body)),
-        std::make_tuple(http::status::ok, req.version())};
+    http::response<http::string_body> res {
+        http::status::ok, req.version()
+    };
+    res.set(http::field::content_type, "text/html");
     res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-    res.set(http::field::content_type, mime_type(path));
-    res.content_length(size);
     res.keep_alive(req.keep_alive());
+    res.body() = "hello, world!";
+    res.prepare_payload();
     return send(std::move(res));
+    // http::response<http::file_body> res{
+    //     std::piecewise_construct,
+    //     std::make_tuple(std::move(body)),
+    //     std::make_tuple(http::status::ok, req.version())};
+    // res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
+    // res.set(http::field::content_type, mime_type(path));
+    // res.content_length(size);
+    // res.keep_alive(req.keep_alive());
+    // return send(std::move(res));
 }
 
 //------------------------------------------------------------------------------
