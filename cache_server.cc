@@ -56,7 +56,7 @@ struct bad_args_exception: public std::exception{
 
 //Template function since we may have different types of requests passed in
 template<class Body, class Allocator, class Send>
-void handle_request(http::request<Body, http::basic_fields<Allocator>>&& req, Send&& send, Cache server_cache)
+void handle_request(http::request<Body, http::basic_fields<Allocator>>&& req, Send&& send, Cache* server_cache)
 {
 
     //Lambda for handling errors, borrowed from async beast server example
@@ -101,25 +101,26 @@ void handle_request(http::request<Body, http::basic_fields<Allocator>>&& req, Se
     {
         //First we extract the key and the value from the request target
         std::stringstream target_string(std::string(req.target()).substr(1)); //Slice off the first "/" then make a sstream for further slicing
-        std::string key_str;
-        std::string value;
-        std::getline(target_string, key_str, '/')
-        std::getline(target_string, value, '/')
+        std::string key;
+        std::string val_str;
+        std::getline(target_string, key, '/');
+        std::getline(target_string, val_str, '/');
         //And now we need to convert the value into a char pointer so we can insert into the cache
-        Cache::val_type key = const_cast<char*>(key_str.c_str())
+        Cache::size_type size = val_str.size();
+        Cache::val_type val = const_cast<char*>(val_str.c_str());
 
         //We then check if the key is already in the Cache (need for status code) and then set the value
         bool key_created = false;
-        Cache::size_type size;
-        Cache::val_type val = server_cache.get(key, size);
-        if(strcmp(val, "")){
+        Cache::size_type size_check;
+        Cache::val_type val_check = server_cache->get(key, size_check);
+        if(strcmp(val_check, "")){
             key_created = true;
         }
-        server_cache.set(key, value)
+
+        server_cache->set(key, val, size);//Need to fix val here; make a pointer
         //Now we can create and send the response
         http::response<http::empty_body> res;
-        res.set(boost::beast::http::field::content_location, "/" + key_str);
-        http::response<boost::beast::http::string_body> res;
+        res.set(boost::beast::http::field::content_location, "/" + key);
         res.version(11);   // HTTP/1.1
         //set the appropriate status code based on if a new entry was created
         if(key_created){
@@ -133,7 +134,7 @@ void handle_request(http::request<Body, http::basic_fields<Allocator>>&& req, Se
     //Will send a response for if key was deleted or not found; same effects either way
     if(req.method() == http::verb::delete_) {
         key_type key = std::string(req.target()).substr(1);
-        auto success = server_cache.del(key);
+        auto success = server_cache->del(key);
         http::response<boost::beast::http::string_body> res;
         res.version(11);   // HTTP/1.1
         res.result(boost::beast::http::status::ok);
@@ -159,7 +160,8 @@ void handle_request(http::request<Body, http::basic_fields<Allocator>>&& req, Se
         res.set(boost::beast::http::field::server, BOOST_BEAST_VERSION_STRING);
         res.set(boost::beast::http::field::content_type, "application/json");
         res.set(boost::beast::http::field::accept, "application/json");
-        res.set(boost::beast::http::field::space_used, server_cache.space_used());
+        res.insert("Space-Used", server_cache->space_used());
+        //res["Space-Used"] = std::to_string(server_cache->space_used());
         res.keep_alive(req.keep_alive());
         return send(std::move(res));
     }
@@ -169,7 +171,7 @@ void handle_request(http::request<Body, http::basic_fields<Allocator>>&& req, Se
             return send(not_found(req.target()));
         }
         //Resets the cache and sends back a basic response with string body
-        server_cache.reset();
+        server_cache->reset();
         http::response<boost::beast::http::string_body> res;
         res.version(11);   // HTTP/1.1
         res.result(boost::beast::http::status::ok);
