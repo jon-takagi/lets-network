@@ -56,7 +56,7 @@ struct bad_args_exception: public std::exception{
 
 
 //Template function since we may have different types of requests passed in
-template< class Body, class Allocator,class Send>
+template< class Body, class Allocator,class Send
 void handle_request(http::request<Body, http::basic_fields<Allocator>>&& req, Send&& send, Cache* server_cache)
 {
     auto const server_error =
@@ -147,7 +147,6 @@ void handle_request(http::request<Body, http::basic_fields<Allocator>>&& req, Se
         bool key_created = false;
         Cache::size_type size = 0;
         //We then check if the key is already in the Cache (need for status code) and then set the value
-
         if(server_cache->get(key_str, size) == nullptr){
             key_created = true;
             size = val_str.length()+1;
@@ -160,7 +159,6 @@ void handle_request(http::request<Body, http::basic_fields<Allocator>>&& req, Se
         } else {
             std::cout <<"done" << std::endl;
         }
-
         //Now we can create and send the response
         http::response<boost::beast::http::string_body> res;
         res.set(boost::beast::http::field::content_location, "/" + key_str);
@@ -204,7 +202,7 @@ void handle_request(http::request<Body, http::basic_fields<Allocator>>&& req, Se
         res.set(boost::beast::http::field::server, BOOST_BEAST_VERSION_STRING);
         res.set(boost::beast::http::field::content_type, "application/json");
         res.set(boost::beast::http::field::accept, "application/json");
-        res.content_length(server_cache->space_used());
+        res.insert("Space-Used", server_cache->space_used());
         res.keep_alive(req.keep_alive());
         return send(std::move(res));
     }
