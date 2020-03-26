@@ -3,7 +3,6 @@
 #include "cache.hh"
 
 #include <iostream>
-#include <cstring>
 
 using entry_type = std::pair<Cache::val_type, Cache::size_type>; //To better track size for entries
 
@@ -14,9 +13,6 @@ class Cache::Impl{
         size_type maxmem_;
         Evictor* evictor_;
 };
-// Cache::Cache(std::string host, std::string port) {
-//
-// };
 
 Cache::Cache(size_type maxmem,float max_load_factor, Evictor* evictor, hash_func hasher)
  : pImpl_(new Impl()) {
@@ -50,15 +46,11 @@ void Cache::set(key_type key, val_type val, size_type size) {
         }
     }
     byte_type *copy = new byte_type[size];
-    /*
     int i = 0;
     while(val[i] != '\0'){ //Searching for null terminator
         copy[i] = val[i];
         i++;
     }
-    copy[i] = val[i]
-    */
-    memcpy(copy, val, size);
     val_type entry_val = copy;
     pImpl_->dict_.insert(std::make_pair(key, std::make_pair(entry_val, size)));
     // need to free copy
