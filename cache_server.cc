@@ -19,26 +19,13 @@
 #include <thread>
 #include <vector>
 #include <sstream>
+#include "kv_json.hh"
 
 namespace beast = boost::beast;         // from <boost/beast.hpp>
 namespace http = beast::http;           // from <boost/beast/http.hpp>
 namespace net = boost::asio;            // from <boost/asio.hpp>
 using tcp = boost::asio::ip::tcp;       // from <boost/asio/ip/tcp.hpp>
 
-struct kv_json {
-    key_type key_;
-    Cache::val_type value_;
-    void load(key_type k, Cache::val_type val) {
-        key_ = k;
-        value_ = val;
-    }
-    void write(const std::string &filename) {
-        boost::property_tree::ptree tree;
-        tree.put("key", key_);
-        tree.put("value", value_);
-        boost::property_tree::write_json(filename, tree);
-    }
-};
 
 // Report a failure
 void
@@ -169,7 +156,7 @@ void handle_request(http::request<Body, http::basic_fields<Allocator>>&& req, Se
         } else {
             res.result(204);
         }
-        std::cout << "cache[" << key << "] now equals: " << server_cache -> get(key, size);
+        std::cout << "cache[" << key << "] now equals: " << server_cache -> get(key, size) << std::endl;
         return send(std::move(res));
     }
 
