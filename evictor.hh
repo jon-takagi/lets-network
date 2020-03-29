@@ -14,16 +14,16 @@ using key_type = std::string;
 // eviction, which also deletes a key. There is no explicit deletion
 // mechanism other than eviction.
 class Evictor {
- public:
-  Evictor() = default;
-  virtual ~Evictor() = default;
-  Evictor(const Evictor&) = delete;  // noncopiable
-  Evictor& operator=(const Evictor&) = delete;
+    public:
+        Evictor() = default;
+        virtual ~Evictor() = default;
+        Evictor(const Evictor&) = delete;  // noncopiable
+        Evictor& operator=(const Evictor&) = delete;
 
-  // Inform evictor that a certain key has been set or get:
-  virtual void touch_key(const key_type&) = 0;
+        // Inform evictor that a certain key has been set or get:
+        virtual void touch_key(const key_type&) = 0;
 
-  // Request evictor for the next key to evict, and remove it from evictor.
-  // If evictor doesn't know what to evict, return an empty key ("").
-  virtual const key_type evict() = 0;
+        // Request evictor for the next key to evict, and remove it from evictor.
+        // If evictor doesn't know what to evict, return an empty key ("").
+        virtual const key_type evict() = 0;
 };
