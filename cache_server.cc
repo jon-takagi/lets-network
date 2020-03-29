@@ -19,26 +19,13 @@
 #include <thread>
 #include <vector>
 #include <sstream>
+#include "kv_json.hh"
 
 namespace beast = boost::beast;         // from <boost/beast.hpp>
 namespace http = beast::http;           // from <boost/beast/http.hpp>
 namespace net = boost::asio;            // from <boost/asio.hpp>
 using tcp = boost::asio::ip::tcp;       // from <boost/asio/ip/tcp.hpp>
 
-struct kv_json {
-    key_type key_;
-    Cache::val_type value_;
-    void load(key_type k, Cache::val_type val) {
-        key_ = k;
-        value_ = val;
-    }
-    void write(const std::string &filename) {
-        boost::property_tree::ptree tree;
-        tree.put("key", key_);
-        tree.put("value", value_);
-        boost::property_tree::write_json(filename, tree);
-    }
-};
 
 // Report a failure
 void
@@ -46,13 +33,6 @@ fail(beast::error_code ec, char const* what)
 {
     std::cerr << what << ": " << ec.message() << "\n";
 }
-
-//
-struct bad_args_exception: public std::exception{
-    const char *what() {
-        return "Bad parameters";
-    }
-};
 
 
 //Template function since we may have different types of requests passed in
@@ -109,19 +89,20 @@ void handle_request(http::request<Body, http::basic_fields<Allocator>>&& req, Se
       key_type key = std::string(req.target()).substr(1); //make a string and slice off the "/"" from the target
       Cache::size_type size;
       std::cout << "getting..." << key << std::endl;
-      Cache::val_type val = server_cache->get(key, size);
-      std::cout << "cache["<<key<<"]=" << val << std::endl;
-      std::cout << server_cache->get("key_one", size) << std::endl;
 
-      std::cout << server_cache->space_used() << std::endl;
       if(server_cache->get(key, size) == nullptr){
+          std::cout << "not found" << std::endl;
           return send(not_found(key));
       } else {
+          Cache::val_type val = server_cache->get(key, size);
+          std::cout << "cache["<<key<<"]=" << val << std::endl;
           http::response<boost::beast::http::string_body> res;
           res.version(11);   // HTTP/1.1
           res.result(boost::beast::http::status::ok);
           res.set(boost::beast::http::field::server, BOOST_BEAST_VERSION_STRING);
-          res.body() = "{ \"key\": " + key + ", \"value\":" + val + "}";
+
+          kv_json kv(key, val);
+          res.body() = kv.as_string();
           res.set(boost::beast::http::field::content_type, "json");
           res.content_length(key.length() + size + 19);
           res.keep_alive(req.keep_alive());
@@ -135,7 +116,7 @@ void handle_request(http::request<Body, http::basic_fields<Allocator>>&& req, Se
     if(req.method() == http::verb::put)
     {
         //First we extract the key and the value from the request target
-        std::cout << "target: " << req.target() << std::endl << std::endl;
+        // std::cout << "target: " << req.target() << std::endl << std::endl;
         std::stringstream target_string(std::string(req.target()).substr(1)); //Slice off the first "/" then make a sstream for further slicing
         std::string key_str;
         std::string val_str;
@@ -154,7 +135,7 @@ void handle_request(http::request<Body, http::basic_fields<Allocator>>&& req, Se
         std::cout << "setting...";
         server_cache->set(key, val, size);
         if(server_cache -> get(key, size)[0] == '\0') {
-            std::cout << "\n error." << std::endl;
+            std::cout << "error." << std::endl;
             return send(server_error("auuuuuugh"));
         } else {
             std::cout <<"done" << std::endl;
@@ -169,22 +150,26 @@ void handle_request(http::request<Body, http::basic_fields<Allocator>>&& req, Se
         } else {
             res.result(204);
         }
-        std::cout << "cache[" << key << "] now equals: " << server_cache -> get(key, size);
+        // std::cout << "cache[" << key << "] now equals: " << server_cache -> get(key, size) << std::endl;
         return send(std::move(res));
     }
 
     //Will send a response for if key was deleted or not found; same effects either way
     if(req.method() == http::verb::delete_) {
+        std::cout << "deleting ";
         key_type key = std::string(req.target()).substr(1);
+        std::cout << key << "...";
         auto success = server_cache->del(key);
         http::response<boost::beast::http::string_body> res;
         res.version(11);   // HTTP/1.1
         res.result(boost::beast::http::status::ok);
         res.set(boost::beast::http::field::server, BOOST_BEAST_VERSION_STRING);
         if(success){
+            std::cout << "done" << std::endl;
             res.body() = "The key " + key + " was deleted from the cache\n";
             res.content_length(key.length() + 36);
         } else {
+            std::cout << "error: not found" << std::endl;
             res.body() = "The key " + key + " was not found in the cache\n";
             res.content_length(key.length() + 36);
         }
@@ -487,7 +472,7 @@ int main(int ac, char* av[])
         std::cout << "server: " << server<< "\n";
         std::cout <<"threads: " << threads << "\n";
         if(threads < 0) {
-            throw bad_args_exception();
+            std::cerr << "args are wrong - must use >0 threads." << std::endl;
         }
         Cache server_cache(maxmem);
         boost::asio::io_context ioc{threads};
@@ -508,10 +493,6 @@ int main(int ac, char* av[])
         ioc.run();
 
         return EXIT_SUCCESS;
-    }
-    catch(bad_args_exception& e) {
-        std::cerr << "bad arguments: " << e.what() << std::endl;
-        return 1;
     }
     catch(std::exception& e) {
         std::cerr << "error: " << e.what() << "\n";
