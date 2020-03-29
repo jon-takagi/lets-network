@@ -94,11 +94,15 @@ Cache::val_type Cache::get(key_type key, size_type& val_size) const{
     if(res.result() == http::status::not_found){
         return nullptr;
     }
+
     std::string data_str = boost::beast::buffers_to_string(res.body().data());
     kv_json kv(data_str);
-    val_type val = kv.value_;
+    //Here's the hacky workaround to make sure we don't lose the memory our return val points to
+    //val_type val = kv.value_ would lose the data once kv was destroyed
+    std::string string_holder(kv.value_);
+    val_type val = const_cast<char*>(string_holder.c_str());
 
-    val_size = strlen(val);
+    val_size = strlen(val)+1;//we count the null terminator as well
     return val;
 }
 bool Cache::del(key_type key) {
@@ -131,7 +135,7 @@ void Cache::reset() {
     // POST /reset
     http::request<http::string_body> req;
     req.method(http::verb::post);
-    req.target("/");
+    req.target("/reset");
     req.version(11);
     req.set(http::field::host, pImpl_->host_);
     req.set(http::field::user_agent, BOOST_BEAST_VERSION_STRING);
