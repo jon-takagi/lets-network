@@ -2,23 +2,22 @@
 #include <boost/property_tree/json_parser.hpp>
 #include <boost/foreach.hpp>
 #include <string>
-#include <set>
 #include <exception>
+#include <sstream>
 #include <iostream>
 #include "kv_json.hh"
-
+//
 int main()
 {
-    try
-    {
-        kv_json kv("key_one", "val_one");
-        std::string json = kv.as_string();
-        // boost::property_tree::write_json(json, ds);
-        std::cout << json << std::endl;
-    }
-    catch (std::exception &e)
-    {
-        std::cout << "Error: " << e.what() << "\n";
-    }
+    // key_type key = "key_one";
+    // Cache::val_type val = "val_one";
+    // kv_json kv(key, val);
+    // std::string json = kv.as_string();
+    // // std::string json = "hello, world!";
+    // // boost::property_tree::write_json(json, kv);
+    // std::cout << kv.as_string() << std::endl;
+    std::string str = "{ \"key\": \"key_one\", \"value\": \"val_one\"}";
+    kv_json kv2(str);
+    // std::cout << kv2.key_ << ": " << kv2.value_ << std::endl;
     return 0;
 }
