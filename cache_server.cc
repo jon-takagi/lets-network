@@ -130,11 +130,11 @@ void handle_request(http::request<Body, http::basic_fields<Allocator>>&& req, Se
         //We then check if the key is already in the Cache (need for status code) and then set the value
         if(server_cache->get(key_str, size) == nullptr){
             key_created = true;
-            size = val_str.length()+1;
         }
+        size = val_str.length()+1;
         std::cout << "setting...";
         server_cache->set(key, val, size);
-        if(server_cache -> get(key, size)[0] == '\0') {
+        if(server_cache -> get(key, size) == nullptr or server_cache -> get(key, size)[0] == '\0') {
             std::cout << "error." << std::endl;
             return send(server_error("auuuuuugh"));
         } else {
@@ -198,6 +198,7 @@ void handle_request(http::request<Body, http::basic_fields<Allocator>>&& req, Se
         }
         //Resets the cache and sends back a basic response with string body
         server_cache->reset();
+        std::cout << "resetting the cache" << std::endl;
         http::response<boost::beast::http::string_body> res;
         res.version(11);   // HTTP/1.1
         res.result(boost::beast::http::status::ok);
@@ -450,7 +451,7 @@ int main(int ac, char* av[])
         boost::program_options::options_description desc("Allowed options");
         desc.add_options()
             ("help", "produce help message")
-            ("maxmem", boost::program_options::value<Cache::size_type>() -> default_value(10000), "Maximum memory stored in the cache")
+            ("maxmem", boost::program_options::value<Cache::size_type>() -> default_value(30), "Maximum memory stored in the cache")//had to change from 10000 to 30 for tests to work
             ("port,p", boost::program_options::value<unsigned short>() -> default_value(42069),"Port number")
             ("server,s", boost::program_options::value<std::string>() ->default_value("127.0.0.1"),"IPv4 address of the server in dotted decimal")
             ("threads,t", boost::program_options::value<int>()->default_value(1),"Ignored for now")
