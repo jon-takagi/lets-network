@@ -38,6 +38,25 @@ Cache::~Cache() {
         throw beast::system_error{ec};
 }
 
+template <class Body, class Allocator>
+http::response<http::dynamic_body> get_response(http::request<Body, http::basic_fields<Allocator>>&& req,){
+    try
+    {
+        http::write(pImpl_->stream_, req);
+        beast::flat_buffer buffer;
+        http::response<http::dynamic_body> res;
+        http::read(pImpl_->stream_, buffer, res);
+        std::cout << res << std::endl;
+        return res;
+    }
+    catch(std::exception const& e)
+    {
+        //Do whatever something here
+        std::cerr << "Error: " << e.what() << std::endl;
+        return EXIT_FAILURE;
+    }
+}
+
 void Cache::set(key_type key, val_type val, size_type size) {
     std::cout << key << ": " << val << "; " << size << std::endl;
     // PUT /key/val
@@ -48,23 +67,8 @@ void Cache::set(key_type key, val_type val, size_type size) {
     req.version(11);
     req.set(http::field::host, pImpl_->host_);
     req.set(http::field::user_agent, BOOST_BEAST_VERSION_STRING);
-    try{
-        auto const results = resolver.resolve(pImpl_->host_, pImpl_->port_);
-        stream.connect(results);
-        http::write(stream, req);
-        beast::flat_buffer buffer;
-        http::response<http::dynamic_body> res;
-        http::read(stream, buffer, res);
-        std::cout << res << std::endl;
-        beast::error_code ec;
-        stream.socket().shutdown(tcp::socket::shutdown_both, ec);
-        if(ec && ec != beast::errc::not_connected)
-            throw beast::system_error{ec};
-    }
-    catch(std::exception const& e){
-        std::cerr << "Error: " << e.what() << std::endl;
-        return EXIT_FAILURE;
-    }
+    auto res = get_response(req);
+    //Nothing else to do since get_response handles the sending
 }
 
 Cache::val_type Cache::get(key_type key, size_type& val_size) {
@@ -89,9 +93,7 @@ bool Cache::del(key_type key) {
     req.version(11);
     req.set(http::field::host, pImpl_->host_);
     req.set(http::field::user_agent, BOOST_BEAST_VERSION_STRING);
-    //try catch
-    //error checking
-    //else
+    auto res = get_response(req);
     return true;
 }
 Cache::size_type Cache::space_used() const{
