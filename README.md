@@ -37,7 +37,9 @@ To respond to a GET request, it first parses the key and attempts to `get` it fr
 #### PUT
 To respond to a PUT request, the method first extracts and parses the specified key and value into a `key_type` and `val_type` respectively. We check if the key is already in the cache, and set the status to either 204 No Content if the key is present or 201 Created if not - the `set` method of the cache is `void`, so we don't need to return any information, but complying with the HTTP standards requires that when we create an object we use the 201 status. After that, we set the key / value pair in the underlying cache, then return a response with the correct status code.
 #### DELETE
-To respond to a DELETE request, we parse the desired key and attempt to delete it. If the key was there, we send a 200 OK response after deleting it. If it wasn't, the call to `del` doesn't change the cache and we send a 404 Not Found response. 
+To respond to a DELETE request, we parse the desired key and attempt to delete it. If the key was there, we send a 200 OK response after deleting it. If it wasn't, the call to `del` doesn't change the cache and we send a 404 Not Found response.
 #### HEAD
+To respond to a HEAD request, we call the `space_used` function on the cache. We then insert the result into the "Space-Used" field of our response. Also, the response to a HEAD request has no body, so we use the `http::empty_body` template for our response.
 #### POST
+The POST request is used to reset the cache, so we ensure that the target is `"/reset"`. We then reset the underlying cache, then send a 200 OK response to notify the user that the cache has successfully been reset.
 ## TCP Client
