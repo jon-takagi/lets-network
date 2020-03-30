@@ -47,7 +47,6 @@ TEST_CASE("Set and Get")
         test_cache.set("key_two", "value_2", 8);
         test_cache.set("key_three", "value_3", 8);
         Cache::val_type val = "value_2"; //prepare a char pointer for comparison
-
         REQUIRE(*test_cache.get("key_two", size) == *val);
 
         test_cache.reset();
