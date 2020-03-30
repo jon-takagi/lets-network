@@ -89,22 +89,23 @@ void handle_request(http::request<Body, http::basic_fields<Allocator>>&& req, Se
       key_type key = std::string(req.target()).substr(1); //make a string and slice off the "/"" from the target
       Cache::size_type size;
       std::cout << "getting..." << key << std::endl;
+      http::response<boost::beast::http::string_body> res;
 
-      if(server_cache->get(key, size) == nullptr){
+      Cache::val_type val = server_cache->get(key, size);
+      if(val == nullptr){
           std::cout << "not found" << std::endl;
           return send(not_found(key));
       } else {
-          Cache::val_type val = server_cache->get(key, size);
           std::cout << "cache["<<key<<"]=" << val << std::endl;
-          http::response<boost::beast::http::string_body> res;
           res.version(11);   // HTTP/1.1
           res.result(boost::beast::http::status::ok);
           res.set(boost::beast::http::field::server, BOOST_BEAST_VERSION_STRING);
 
           kv_json kv(key, val);
-          res.body() = kv.as_string();
+          std::string json = kv.as_string();
+          res.body() = json;
           res.set(boost::beast::http::field::content_type, "json");
-          res.content_length(key.length() + size + 19);
+          res.content_length(json.size() + 1);
           res.keep_alive(req.keep_alive());
           res.prepare_payload();
           return send(std::move(res));
@@ -162,18 +163,14 @@ void handle_request(http::request<Body, http::basic_fields<Allocator>>&& req, Se
         auto success = server_cache->del(key);
         http::response<boost::beast::http::string_body> res;
         res.version(11);   // HTTP/1.1
-        res.result(boost::beast::http::status::ok);
         res.set(boost::beast::http::field::server, BOOST_BEAST_VERSION_STRING);
         if(success){
             std::cout << "done" << std::endl;
-            res.body() = "The key " + key + " was deleted from the cache\n";
-            res.content_length(key.length() + 36);
+            res.result(boost::beast::http::status::ok);
         } else {
             std::cout << "error: not found" << std::endl;
-            res.body() = "The key " + key + " was not found in the cache\n";
-            res.content_length(key.length() + 36);
+            res.result(boost::beast::http::status::not_found);
         }
-        res.set(boost::beast::http::field::content_type, "text");
         res.keep_alive(req.keep_alive());
         res.prepare_payload();
         return send(std::move(res));
@@ -266,7 +263,6 @@ class session : public std::enable_shared_from_this<session>
 
     beast::tcp_stream stream_;
     beast::flat_buffer buffer_;
-    std::shared_ptr<std::string const> doc_root_;
     http::request<http::string_body> req_;
     std::shared_ptr<void> res_;
     send_lambda lambda_;
@@ -381,33 +377,28 @@ public:
 
         // Open the acceptor
         acceptor_.open(endpoint.protocol(), ec);
-        if(ec)
-        {
+        if(ec) {
             fail(ec, "open");
             return;
         }
 
         // Allow address reuse
         acceptor_.set_option(net::socket_base::reuse_address(true), ec);
-        if(ec)
-        {
+        if(ec) {
             fail(ec, "set_option");
             return;
         }
 
         // Bind to the server address
         acceptor_.bind(endpoint, ec);
-        if(ec)
-        {
+        if(ec) {
             fail(ec, "bind");
             return;
         }
 
         // Start listening for connections
-        acceptor_.listen(
-            net::socket_base::max_listen_connections, ec);
-        if(ec)
-        {
+        acceptor_.listen(net::socket_base::max_listen_connections, ec);
+        if(ec) {
             fail(ec, "listen");
             return;
         }
@@ -464,8 +455,8 @@ int main(int ac, char* av[])
             return 0;
         }
         auto const server = boost::asio::ip::make_address(vm["server"].as<std::string>());
-        auto const port = vm["port"].as<unsigned short>();
-        auto const threads = vm["threads"].as<int>();
+        unsigned short const port = vm["port"].as<unsigned short>();
+        int const threads = vm["threads"].as<int>();
         Cache::size_type maxmem = vm["maxmem"].as<Cache::size_type>();
 
         std::cout << "maxmem: "<<maxmem<< "\n";
@@ -474,14 +465,13 @@ int main(int ac, char* av[])
         std::cout <<"threads: " << threads << "\n";
         if(threads < 0) {
             std::cerr << "args are wrong - must use >0 threads." << std::endl;
+            return 1;
         }
         Cache server_cache(maxmem);
+        Cache* server_cache_p = &server_cache;
         boost::asio::io_context ioc{threads};
 
-        Cache* server_cache_p = &server_cache;
-        std::make_shared<listener>(
-            ioc,
-            tcp::endpoint{server, port}, server_cache_p)->run();
+        std::make_shared<listener>(ioc,tcp::endpoint{server, port}, server_cache_p)->run();
 
         std::vector<std::thread> v;
         v.reserve(threads - 1);

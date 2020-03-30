@@ -116,7 +116,7 @@ bool Cache::del(key_type key) {
     req.prepare_payload();
 
     http::response<http::dynamic_body> res = pImpl_->send(req);
-    return true;
+    return res.result() == http::status::ok;
 }
 Cache::size_type Cache::space_used() const{
 
