@@ -25,6 +25,16 @@ public:
     net::ip::basic_resolver<tcp>::results_type results_;
     net::io_context ioc_;
 
+    http::request<http::string_body> prep_req(http::verb method, std::string target) {
+        http::request<http::string_body> req;
+        req.method(method);
+        req.target(target);
+        req.version(11);
+        req.set(http::field::host, host_+":"+port_);
+        req.set(http::field::user_agent, BOOST_BEAST_VERSION_STRING);
+        req.prepare_payload();
+        return req;
+    }
     http::response<http::dynamic_body> send(http::request<http::string_body> req) {
         try{
             beast::tcp_stream stream(ioc_);
@@ -48,7 +58,8 @@ public:
         catch(std::exception const& e){
             std::cerr << "Error: " << e.what() << std::endl;
             http::response<http::dynamic_body> res;
-            res.result(420);
+            res.result(499);
+            res.insert("error: ", e.what());
             return res;
         }
     }
@@ -66,30 +77,13 @@ Cache::~Cache() {
 
 void Cache::set(key_type key, val_type val, size_type size) {
     // PUT /key/val
-
-    http::request<http::string_body> req;
-    req.method(http::verb::put);
-    std::string val_str(val);
-    req.target("/" + key + "/" + val_str);
-    req.version(11);
-    req.set(http::field::host, pImpl_->host_);
-    req.set(http::field::user_agent, BOOST_BEAST_VERSION_STRING);
-    req.content_length(size);
-    req.prepare_payload();
-
-    http::response<http::dynamic_body> res = pImpl_->send(req);
+    size += 1;
+    pImpl_->send(pImpl_->prep_req(http::verb::put, "/" + key + "/" + std::string(val)));
 }
 
 Cache::val_type Cache::get(key_type key, size_type& val_size) const{
     //GET /key
-    http::request<http::string_body> req;
-    req.method(http::verb::get);
-    req.target("/" + key);
-    req.version(11);
-    req.set(http::field::host, pImpl_->host_);
-    req.set(http::field::user_agent, BOOST_BEAST_VERSION_STRING);
-    req.prepare_payload();
-
+    http::request<http::string_body> req = pImpl_->prep_req(http::verb::get, "/"+key);
     http::response<http::dynamic_body> res = pImpl_->send(req);
     if(res.result() == http::status::not_found){
         return nullptr;
@@ -107,39 +101,16 @@ Cache::val_type Cache::get(key_type key, size_type& val_size) const{
 }
 bool Cache::del(key_type key) {
     //DELETE /key
-    http::request<http::string_body> req;
-    req.method(http::verb::delete_);
-    req.target("/" + key);
-    req.version(11);
-    req.set(http::field::host, pImpl_->host_);
-    req.set(http::field::user_agent, BOOST_BEAST_VERSION_STRING);
-    req.prepare_payload();
+    http::request<http::string_body> req = pImpl_->prep_req(http::verb::delete_, "/"+key);
 
     http::response<http::dynamic_body> res = pImpl_->send(req);
     return res.result() == http::status::ok;
 }
 Cache::size_type Cache::space_used() const{
-
-    http::request<http::string_body> req;
-    req.method(http::verb::head);
-    req.target("/");
-    req.version(11);
-    req.set(http::field::host, pImpl_->host_);
-    req.set(http::field::user_agent, BOOST_BEAST_VERSION_STRING);
-    req.prepare_payload();
-
-    http::response<http::dynamic_body> res = pImpl_->send(req);
+    http::response<http::dynamic_body> res = pImpl_->send(pImpl_->prep_req(http::verb::head, "/"));
     return std::stoi(std::string(res["Space-Used"]));
 }
 void Cache::reset() {
     // POST /reset
-    http::request<http::string_body> req;
-    req.method(http::verb::post);
-    req.target("/reset");
-    req.version(11);
-    req.set(http::field::host, pImpl_->host_);
-    req.set(http::field::user_agent, BOOST_BEAST_VERSION_STRING);
-    req.prepare_payload();
-
-    pImpl_->send(req);
+    pImpl_->send(pImpl_->prep_req(http::verb::post, "/reset"));
 }

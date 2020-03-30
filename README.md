@@ -17,7 +17,7 @@ Maxmem is measured in bytes. The default was selected to match the values we use
 
 Server is the hostname of the machine being used to host. Using localhost allows us to test it internally, and determining the right IP for a production host is beyond the scope of our program.
 
-Port is the TCP port to listen on. Any port between 1024 and 49151 is a "user" port, and no other common applications use this point, according to (wikipedia)[https://en.wikipedia.org/wiki/List_of_TCP_and_UDP_port_numbers]. The precise number was chosen randomly from [1024,49151], and after consulting Eitan, we decided not to use a dynamic port number.
+Port is the TCP port to listen on. Any port between 1024 and 49151 is a "user" port, and no other common applications use this point, according to [wikipedia](https://en.wikipedia.org/wiki/List_of_TCP_and_UDP_port_numbers). The precise number was chosen randomly from [1024,49151], and after consulting Eitan, we decided not to use a dynamic port number.
 
 Threads is the number of CPU threads used to run our code. It defaults to 1, and debugging multithreading bugs is outside the scope of this assignment. If a value less than 1 is passed, the server throws an error.
 ### Architecture
@@ -44,3 +44,23 @@ To respond to a HEAD request, we call the `space_used` function on the cache. We
 #### POST
 The POST request is used to reset the cache, so we ensure that the target is `"/reset"`. We then reset the underlying cache, then send a 200 OK response to notify the user that the cache has successfully been reset.
 ## TCP Client
+`cache_client.cc` is an implementation of the API defined in `cache.hh` that connects to a cache_server over TCP. It defines the 4 methods defined in the header, as detailed below, as well as an internal method `send`, which takes an http::request, sends it to the server, and returns any response it receives. This function is a helper that helps reduce code duplication.
+### constructor / destructor
+The constructor takes a host address and port number as parameters, both as `std::string`s. It then resolves the address using the beast `resolver` class, and saves the results for later use by `send`.
+### send
+This method constructs a `tcp_stream`, then connects it to the endpoints resolved during the construction of the client. It sends the message it was passed. If an error occurs, it returns a response with a 499 error code and the `what` of the error.
+
+Otherwise, it reads in the response, parses it into a `beast::http::response` object. After closing the connection, it returns the response object.
+### prep_req
+This method takes an `http::verb` and a target, as an `std::string`. It constructs a request object with the given method and target.
+The host is the same as the host being connected to, the agent is the `BOOST_BEAST_VERSION_STRING`, and we use HTTP version 1.1
+### API defined methods
+Each of these methods constructs an `http::request<string_body>` with default host, user_agent and version as set by `prep_req`.
+| Method | Target   | Method |
+|--------|----------|--------|
+| `set`  | /key/val | PUT    |
+| `get`  | /key     | GET    |
+| `del`  | /key     | DELETE |
+| `reset`| /reset   | POST   |  
+
+To avoid the "unused parameter" warning, the `set` method increments the `size` argument it is passed. We considered printing it instead, but that cluttered up our test results.
