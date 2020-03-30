@@ -17,9 +17,5 @@ clean:
 
 server.bin: cache_lib.o fifo_evictor.o
 	$(CXX) $(LDFLAGS) cache_server.cc -o $@ $^ /vagrant/systems/boost/lib/libboost_program_options.a
-client.bin:
-	$(CXX) $(LDFLAGS) cache_client.cc -o $@
-json.bin:
-	$(CXX) $(LDFLAGS) json_test.cc -o $@
 net_test.bin: cache_client.o fifo_evictor.o
 	$(CXX) $(LDFLAGS) net_test_lib.cc -o $@ $^
