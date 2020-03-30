@@ -7,10 +7,11 @@ I installed boost into `/usr/local/boost_1_72_0`, then used bootstrap to make a 
 Note that in our makefile we only specify `program_options` to the linker. This is because the other boost libraries we used are "header only" and there is no library archive to link to the compiler, simply using the `-I` flag to add the headers to the include path is sufficient.
 
 ### Command Line Args
+
 Valid arguments are -m --maxmem, -s --server, -p --port, and -t --threads. Passing --help will list the arguments. All of these arguments are optional, and their default values are:
-| Maxmem | Server | Port | Threads |
----------------
-| 30 | "127.0.0.1" | 42069 | 1 |
+| Maxmem | Server      | Port  | Threads |
+|--------|-------------|-------|---------|
+|     30 | "127.0.0.1" | 42069 | 1       |
 
 Maxmem is measured in bytes. The default was selected to match the values we used in previous tests, and must be set for any serious use. However, we expect this code to be tested more than used, so the default matches the tests.
 
