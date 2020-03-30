@@ -7,16 +7,17 @@ I installed boost into `/usr/local/boost_1_72_0`, then used bootstrap to make a 
 Note that in our makefile we only specify `program_options` to the linker. This is because the other boost libraries we used are "header only" and there is no library archive to link to the compiler, simply using the `-I` flag to add the headers to the include path is sufficient.
 
 ### Command Line Args
+
 Valid arguments are -m --maxmem, -s --server, -p --port, and -t --threads. Passing --help will list the arguments. All of these arguments are optional, and their default values are:
-| Maxmem | Server | Port | Threads |
----------------
-| 30 | "127.0.0.1" | 42069 | 1 |
+| Maxmem | Server      | Port  | Threads |
+|--------|-------------|-------|---------|
+|     30 | "127.0.0.1" | 42069 | 1       |
 
 Maxmem is measured in bytes. The default was selected to match the values we used in previous tests, and must be set for any serious use. However, we expect this code to be tested more than used, so the default matches the tests.
 
 Server is the hostname of the machine being used to host. Using localhost allows us to test it internally, and determining the right IP for a production host is beyond the scope of our program.
 
-Port is the TCP port to listen on. Any port between 1024 and 49151 is a "user" port, and no other common applications use this point, according to (wikipedia)[https://en.wikipedia.org/wiki/List_of_TCP_and_UDP_port_numbers]. The precise number was chosen randomly from [1024,49151], and after consulting Eitan, we decided not to use a dynamic port number.
+Port is the TCP port to listen on. Any port between 1024 and 49151 is a "user" port, and no other common applications use this point, according to [wikipedia](https://en.wikipedia.org/wiki/List_of_TCP_and_UDP_port_numbers). The precise number was chosen randomly from [1024,49151], and after consulting Eitan, we decided not to use a dynamic port number.
 
 Threads is the number of CPU threads used to run our code. It defaults to 1, and debugging multithreading bugs is outside the scope of this assignment. If a value less than 1 is passed, the server throws an error.
 ### Architecture
@@ -37,7 +38,29 @@ To respond to a GET request, it first parses the key and attempts to `get` it fr
 #### PUT
 To respond to a PUT request, the method first extracts and parses the specified key and value into a `key_type` and `val_type` respectively. We check if the key is already in the cache, and set the status to either 204 No Content if the key is present or 201 Created if not - the `set` method of the cache is `void`, so we don't need to return any information, but complying with the HTTP standards requires that when we create an object we use the 201 status. After that, we set the key / value pair in the underlying cache, then return a response with the correct status code.
 #### DELETE
-To respond to a DELETE request, we parse the desired key and attempt to delete it. If the key was there, we send a 200 OK response after deleting it. If it wasn't, the call to `del` doesn't change the cache and we send a 404 Not Found response. 
+To respond to a DELETE request, we parse the desired key and attempt to delete it. If the key was there, we send a 200 OK response after deleting it. If it wasn't, the call to `del` doesn't change the cache and we send a 404 Not Found response.
 #### HEAD
+To respond to a HEAD request, we call the `space_used` function on the cache. We then insert the result into the "Space-Used" field of our response. Also, the response to a HEAD request has no body, so we use the `http::empty_body` template for our response.
 #### POST
+The POST request is used to reset the cache, so we ensure that the target is `"/reset"`. We then reset the underlying cache, then send a 200 OK response to notify the user that the cache has successfully been reset.
 ## TCP Client
+`cache_client.cc` is an implementation of the API defined in `cache.hh` that connects to a cache_server over TCP. It defines the 4 methods defined in the header, as detailed below, as well as an internal method `send`, which takes an http::request, sends it to the server, and returns any response it receives. This function is a helper that helps reduce code duplication.
+### constructor / destructor
+The constructor takes a host address and port number as parameters, both as `std::string`s. It then resolves the address using the beast `resolver` class, and saves the results for later use by `send`.
+### send
+This method constructs a `tcp_stream`, then connects it to the endpoints resolved during the construction of the client. It sends the message it was passed. If an error occurs, it returns a response with a 499 error code and the `what` of the error.
+
+Otherwise, it reads in the response, parses it into a `beast::http::response` object. After closing the connection, it returns the response object.
+### prep_req
+This method takes an `http::verb` and a target, as an `std::string`. It constructs a request object with the given method and target.
+The host is the same as the host being connected to, the agent is the `BOOST_BEAST_VERSION_STRING`, and we use HTTP version 1.1
+### API defined methods
+Each of these methods constructs an `http::request<string_body>` with default host, user_agent and version as set by `prep_req`.
+| Method | Target   | Method |
+|--------|----------|--------|
+| `set`  | /key/val | PUT    |
+| `get`  | /key     | GET    |
+| `del`  | /key     | DELETE |
+| `reset`| /reset   | POST   |  
+
+To avoid the "unused parameter" warning, the `set` method increments the `size` argument it is passed. We considered printing it instead, but that cluttered up our test results.

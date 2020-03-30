@@ -169,7 +169,7 @@ void handle_request(http::request<Body, http::basic_fields<Allocator>>&& req, Se
             res.result(boost::beast::http::status::ok);
         } else {
             std::cout << "error: not found" << std::endl;
-            res.result(boost::beast::http::status::not_found);
+            return send(not_found(req.target()));
         }
         res.keep_alive(req.keep_alive());
         res.prepare_payload();
