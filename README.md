@@ -1,3 +1,5 @@
+Jon Takagi and Eli Poppele
+
 ## TCP Server
 Our server is implemented in `cache_server.cc`, which builds into `server.bin`.
 
@@ -21,7 +23,7 @@ Port is the TCP port to listen on. Any port between 1024 and 49151 is a "user" p
 
 Threads is the number of CPU threads used to run our code. It defaults to 1, and debugging multithreading bugs is outside the scope of this assignment. If a value less than 1 is passed, the server throws an error.
 ### Architecture
-The server consists of 2 classes,`listener` and `session`, and 2 methods - `handle_request` and `main`.
+The server consists of 2 classes,`listener` and `session`, and 2 methods - `handle_request` and `main`. The use of classes allows our server to run asynchronously, although in this case we only test and run a single thread. We consulted Boost documentation and example code to understand how to create this basic structure for an async server and synchronous client. 
 
 #### `main`
 The main method parses the command line arguments using `boost::program_options`. First, it creates a `Cache` object using the specified max memory (The other cache parameters are left as default). It then creates a single listener on the specified endpoint, and orders it to run. Finally, it prepares the specified number of threads to be used by the io_context, which allows our code to run on multiple threads.
