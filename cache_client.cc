@@ -21,9 +21,9 @@ class Cache::Impl {
 public:
     std::string host_;
     std::string port_;
-    // beast::tcp_stream* stream_ = nullptr;
     net::ip::basic_resolver<tcp>::results_type results_;
     net::io_context ioc_;
+    beast::tcp_stream stream_;
 
     http::request<http::string_body> prep_req(http::verb method, std::string target) {
         http::request<http::string_body> req;
@@ -69,7 +69,10 @@ Cache::Cache(std::string host, std::string port) : pImpl_(new Impl()){
     pImpl_->host_ = host;
     pImpl_->port_ = port;
     tcp::resolver resolver(pImpl_->ioc_);
-    pImpl_->results_= resolver.resolve(host, port);
+    net::ip::basic_resolver<tcp>::results_type results = resolver.resolve(host, port);
+    pImpl_->stream_(pImpl_->ioc_);
+    pImpl_->stream_.connect(results);
+
 }
 Cache::~Cache() {
     reset();
