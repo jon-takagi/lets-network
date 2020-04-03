@@ -22,10 +22,13 @@ class Cache::Impl {
 public:
     std::string host_;
     std::string port_;
-    // beast::tcp_stream* stream_ = nullptr;
     net::ip::basic_resolver<tcp>::results_type results_;
     net::io_context ioc_;
+<<<<<<< HEAD
     beast::tcp_stream* stream_;
+=======
+    beast::tcp_stream stream_;
+>>>>>>> 55f5d5df3661e8032b6cb3bd54750ff6b6081fe0
 
     http::request<http::string_body> prep_req(http::verb method, std::string target) {
         http::request<http::string_body> req;
