@@ -311,8 +311,10 @@ public:
         boost::ignore_unused(bytes_transferred);
 
         // This means they closed the connection
-        if(ec == http::error::end_of_stream)
+        if(ec == http::error::end_of_stream){
+            std::cout << "end of stream; closing" << std::endl;
             return do_close();
+        }
 
         if(ec)
             return fail(ec, "read");
@@ -336,6 +338,7 @@ public:
         {
             // This means we should close the connection, usually because
             // the response indicated the "Connection: close" semantic.
+            std::cout << "Trying to close" << std::endl;
             return do_close();
         }
 

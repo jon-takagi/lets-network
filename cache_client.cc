@@ -4,6 +4,7 @@
 #include <boost/asio/connect.hpp>
 #include <boost/asio/ip/tcp.hpp>
 #include <cstdlib>
+#include <cassert>
 #include <iostream>
 #include <string>
 #include <boost/property_tree/ptree.hpp>
@@ -24,6 +25,7 @@ public:
     // beast::tcp_stream* stream_ = nullptr;
     net::ip::basic_resolver<tcp>::results_type results_;
     net::io_context ioc_;
+    beast::tcp_stream* stream_;
 
     http::request<http::string_body> prep_req(http::verb method, std::string target) {
         http::request<http::string_body> req;
@@ -37,22 +39,22 @@ public:
     }
     http::response<http::dynamic_body> send(http::request<http::string_body> req) {
         try{
-            beast::tcp_stream stream(ioc_);
+            //beast::tcp_stream stream(ioc_);
             // std::cout << "connecting...";
-            stream.connect(results_);
+            //stream.connect(results_);
             // std::cout << "done" << std::endl;
             // std::cout << "sending...";
-            http::write(stream, req);
+            http::write(*stream_, req);
             // std::cout << "done" << std::endl;
             // std::cout << "waiting for response...";
             beast::flat_buffer buffer;
             http::response<http::dynamic_body> res;
-            http::read(stream, buffer, res);
+            http::read(*stream_, buffer, res);
             // std::cout << "done" << std::endl;
-            beast::error_code ec;
-            stream.socket().shutdown(tcp::socket::shutdown_both, ec);
-            if(ec && ec != beast::errc::not_connected)
-                throw beast::system_error{ec};
+            //beast::error_code ec;
+            //stream.socket().shutdown(tcp::socket::shutdown_both, ec);
+            //if(ec && ec != beast::errc::not_connected)
+            //    throw beast::system_error{ec};
             return res;
         }
         catch(std::exception const& e){
@@ -70,9 +72,40 @@ Cache::Cache(std::string host, std::string port) : pImpl_(new Impl()){
     pImpl_->port_ = port;
     tcp::resolver resolver(pImpl_->ioc_);
     pImpl_->results_= resolver.resolve(host, port);
+    try{
+        pImpl_->stream_ = new beast::tcp_stream(pImpl_->ioc_);
+        //beast::tcp_stream *stream_ptr = stream;
+        // std::cout << "connecting...";
+        pImpl_->stream_->connect(pImpl_->results_);
+        // std::cout << "done" << std::endl;
+        // std::cout << "sending...";
+        //http::write(stream, req);
+        // std::cout << "done" << std::endl;
+        // std::cout << "waiting for response...";
+        //beast::flat_buffer buffer;
+        //http::response<http::dynamic_body> res;
+        //http::read(stream, buffer, res);
+        // std::cout << "done" << std::endl;
+        //beast::error_code ec;
+        //stream.socket().shutdown(tcp::socket::shutdown_both, ec);
+        //if(ec && ec != beast::errc::not_connected)
+        //    throw beast::system_error{ec};
+        //return res;
+    }
+    catch(std::exception const& e){
+        std::cerr << "Error: " << e.what() << std::endl;
+        //http::response<http::dynamic_body> res;
+        //res.result(499);
+        //res.insert("error: ", e.what());
+        assert(false);
+    }
 }
 Cache::~Cache() {
     reset();
+    beast::error_code ec;
+    pImpl_->stream_->socket().shutdown(tcp::socket::shutdown_both, ec);
+    delete pImpl_->stream_;
+    //if(ec && ec != beast::errc::not_connected) throw beast::system_error{ec};
 }
 
 void Cache::set(key_type key, val_type val, size_type size) {
