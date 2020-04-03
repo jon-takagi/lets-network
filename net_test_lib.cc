@@ -161,20 +161,6 @@ TEST_CASE("Reset")
     }
 }
 
-//test using custom hash function results in func being used
-TEST_CASE("Hash Functions")
-{
-
-    SECTION("Hash Use"){
-        test_cache.set("key_one", "value_1", 8);
-
-        REQUIRE(in_vec.back() == "key_one");
-
-        test_cache.reset();
-    }
-
-}
-
 //Touch a few things with the evictor, then test that evict returns the first of those
 //add multiple, evict multiple, check 3rd evict gives 3rd entered
 TEST_CASE("Fifo Evictor")
