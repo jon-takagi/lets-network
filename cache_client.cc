@@ -34,6 +34,7 @@ public:
         req.version(11);
         req.set(http::field::host, host_+":"+port_);
         req.set(http::field::user_agent, BOOST_BEAST_VERSION_STRING);
+        req.keep_alive(true);
         req.prepare_payload();
         return req;
     }

@@ -152,6 +152,8 @@ void handle_request(http::request<Body, http::basic_fields<Allocator>>&& req, Se
             res.result(204);
         }
         // std::cout << "cache[" << key << "] now equals: " << server_cache -> get(key, size) << std::endl;
+        res.keep_alive(req.keep_alive());
+        res.prepare_payload();
         return send(std::move(res));
     }
 
@@ -186,6 +188,7 @@ void handle_request(http::request<Body, http::basic_fields<Allocator>>&& req, Se
         res.set(boost::beast::http::field::accept, "application/json");
         res.insert("Space-Used", server_cache->space_used());
         res.keep_alive(req.keep_alive());
+        res.prepare_payload();
         return send(std::move(res));
     }
 
