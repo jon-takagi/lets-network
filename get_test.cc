@@ -9,7 +9,7 @@
 
 int main(){
     //set up the cache and stuff
-    double min = 999; //can ignore larger values as outliers
+    double min = 999999999; //can ignore larger values as outliers
     for(int i = 0; i < 20; i++){
         auto test_cache = Cache("127.0.0.1", "42069");
         Cache::size_type size;
@@ -17,10 +17,10 @@ int main(){
         double elapsed = 0;
         //start clock and loop
         std::clock_t start = std::clock();
-        test_cache.get("key_two", size);
+        for(int j = 0; j < 1000; j++) test_cache.get("key_two", size);
         std::clock_t end = std::clock();
         elapsed = (end - start ) / (double) CLOCKS_PER_SEC;
-        elapsed = (1000000.0 * elapsed); //convert to microseconds (test)
+        elapsed = (1000.0 * elapsed); //convert to milliseconds (test)
         if(elapsed < min) min = elapsed;
     }
     std::cout << min << std::endl;
