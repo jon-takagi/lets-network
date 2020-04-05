@@ -10,7 +10,7 @@ namespace http = beast::http;           // from <boost/beast/http.hpp>
 namespace net = boost::asio;            // from <boost/asio.hpp>
 using tcp = boost::asio::ip::tcp;       // from <boost/asio/ip/tcp.hpp>
 
-tcp_listener::tcp_listener( net::io_context& ioc, tcp::endpoint endpoint, Cache* cache): 
+tcp_listener::tcp_listener( net::io_context& ioc, tcp::endpoint endpoint, Cache* cache):
     ioc_(ioc),
     acceptor_(net::make_strand(ioc))
 {

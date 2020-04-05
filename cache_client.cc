@@ -24,6 +24,7 @@ public:
     std::string host_;
     std::string tcp_port_;
     unsigned short udp_port_;
+    udp::endpoint udp_endpoint_;
     bool use_udp = true;
     net::io_context ioc_;
     beast::tcp_stream* stream_;
@@ -78,19 +79,18 @@ public:
     }
     http::response<http::dynamic_body> send_udp(http::request<http::string_body> req) {
         try {
+            udp_endpoint_(net::ip::address::from_string(host_), udp_port_);
             std::ostringstream oss;
             oss << req;
             std::string request_string = oss.str();
-            udp::endpoint endpoint_(net::ip::address::from_string(host_), udp_port_);
-            std::cout << "opening...";
-            socket_ -> open(udp::v4());
-            std::cout << "done" << std::endl;
             std::cout << "sending...";
             std::cout << request_string << std::endl;
-            socket_ -> send_to(boost::asio::buffer(request_string, request_string.length()), endpoint_);
+            socket_ -> send_to(boost::asio::buffer(request_string, request_string.length()), udp_endpoint_);
             std::cout << "done" << std::endl;
             boost::array<char, 128> recv_buff;
-            size_t len = socket_ -> receive_from(boost::asio::buffer(recv_buff), endpoint_);
+            std::cout << "recieving...";
+            size_t len = socket_ -> receive_from(boost::asio::buffer(recv_buff), udp_endpoint_);
+            std::cout << "done" << std::endl;
             std::cout.write(recv_buff.data(), len);
             http::response<http::dynamic_body> res;
             return res;
@@ -106,12 +106,18 @@ public:
 
 Cache::Cache(std::string host, std::string tcp_port, unsigned short udp_port) : pImpl_(new Impl()){
     pImpl_->host_ = host;
-    pImpl_->udp_port_ = udp_port;
     pImpl_->tcp_port_ = tcp_port;
+    pImpl_->udp_port_ = udp_port;
     try{
         if(pImpl_->use_udp) {
+            udp::resolver resolver(pImpl_->ioc_);
+            net::ip::basic_resolver<udp>::results_type results = resolver.resolve(host, udp_port);
             std::cout << "initializing socket...";
             pImpl_->socket_ = new net::ip::udp::socket(pImpl_->ioc_);
+            std::cout << "done" << std::endl;
+            pImpl_->udp_endpoint_(net::ip::address, udp_port);
+            std::cout << "opening socket...";
+            pImpl_->socket_ -> open(udp::v4());
             std::cout << "done" << std::endl;
         } else {
             tcp::resolver resolver(pImpl_->ioc_);

@@ -60,9 +60,8 @@ int main(int ac, char* av[])
 
         if(using_udp){
             std::cout << "udp port: " << udp_port << std::endl;
-        } else {
-            std::cout << "tcp port: " << tcp_port << std::endl;
         }
+        std::cout << "tcp port: " << tcp_port << std::endl;
         if(threads < 0) {
             std::cerr << "must use >0 threads." << std::endl;
             return 1;
@@ -72,11 +71,9 @@ int main(int ac, char* av[])
         Cache* server_cache_p = &server_cache;
         boost::asio::io_context ioc{threads};
 
-        if(using_udp) {
-            std::make_shared<udp_handler>(ioc, server_cache_p, udp_port)->run();
-        } else {
-            std::make_shared<tcp_listener>(ioc, tcp::endpoint{server, tcp_port}, server_cache_p)->run();
-        }
+        std::make_shared<udp_handler> (ioc, udp::endpoint{server, udp_port}, server_cache_p)->run();
+        std::make_shared<tcp_listener>(ioc, tcp::endpoint{server, tcp_port}, server_cache_p)->run();
+
         std::vector<std::thread> v;
         v.reserve(threads - 1);
         for(auto i = threads - 1; i > 0; --i)
