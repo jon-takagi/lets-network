@@ -25,83 +25,70 @@ namespace beast = boost::beast;         // from <boost/beast.hpp>
 namespace http = beast::http;           // from <boost/beast/http.hpp>
 namespace net = boost::asio;            // from <boost/asio.hpp>
 using tcp = boost::asio::ip::tcp;       // from <boost/asio/ip/tcp.hpp>
+
 void fail(boost::beast::error_code ec, char const* what) {
     std::cerr << what << ": " << ec.message() << "\n";
 }
 
-template <class Body, class Allocator, class Send>
-void handle_request(http::request<Body, http::basic_fields<Allocator>>&& req, Send&& send, Cache* server_cache)
-{
-    auto const server_error =
-    [&req](beast::string_view what)
-    {
-        http::response<http::string_body> res{http::status::internal_server_error, req.version()};
-        res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-        res.set(http::field::content_type, "text/html");
-        res.keep_alive(req.keep_alive());
-        res.body() = "An error occurred: '" + std::string(what) + "'";
-        res.prepare_payload();
-        return res;
-    };
-    auto const bad_request =
-    [&req](beast::string_view why)
-    {
-        http::response<http::string_body> res{http::status::bad_request, req.version()};
-        res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-        res.set(http::field::content_type, "text/html");
-        res.keep_alive(req.keep_alive());
-        res.body() = std::string(why);
-        res.prepare_payload();
-        return res;
-    };
-
-
-    //Lambda for handling errors, borrowed from async beast server example
-    //and changed here to better fit our needs
-    // Returns a not found response; used when GET and POST go wrong
-    auto const not_found =
-    [&req](beast::string_view target)
-    {
-        http::response<http::string_body> res{http::status::not_found, req.version()};
-        res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-        res.set(http::field::content_type, "text/html");
-        res.keep_alive(req.keep_alive());
-        res.body() = "The resource '" + std::string(target) + "' was not found.\n";
-        res.prepare_payload();
-        return res;
-    };
+http::response<http::string_body> server_error(http::request<http::string_body> req, std::string message) {
+    http::response<http::string_body> res{http::status::internal_server_error, req.version()};
+    res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
+    res.set(http::field::content_type, "text/html");
+    res.keep_alive(req.keep_alive());
+    res.body() = "An error occurred: '" + message + "'";
+    res.prepare_payload();
+    return res;
+}
+http::response<http::string_body> bad_request(http::request<http::string_body> req) {
+    http::response<http::string_body> res{http::status::bad_request, req.version()};
+    res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
+    res.set(http::field::content_type, "text/html");
+    res.keep_alive(req.keep_alive());
+    res.body() = "Unknown HTTP-method";
+    res.prepare_payload();
+    return res;
+}
+http::response<http::string_body> not_found(http::request<http::string_body> req, std::string target) {
+    http::response<http::string_body> res{http::status::not_found, req.version()};
+    res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
+    res.set(http::field::content_type, "text/html");
+    res.keep_alive(req.keep_alive());
+    res.body() = "The resource '" + target + "' was not found.\n";
+    res.prepare_payload();
+    return res;
+}
+http::response<http::string_body> handle_request(http::request<http::string_body>&& req, Cache* server_cache) {
     if( req.method() != http::verb::get &&
         req.method() != http::verb::put &&
         req.method() != http::verb::delete_ &&
         req.method() != http::verb::head &&
         req.method() != http::verb::post)
-        return send(bad_request("Unknown HTTP-method"));
+        return bad_request(req);
 
+    http::response<http::string_body> res;
+    res.version(11);   // HTTP/1.1
+    res.set(boost::beast::http::field::server, BOOST_BEAST_VERSION_STRING);
+    res.keep_alive(req.keep_alive());
     if(req.method() == http::verb::get)
     {
       key_type key = std::string(req.target()).substr(1); //make a string and slice off the "/"" from the target
       Cache::size_type size;
       std::cout << "getting..." << key << std::endl;
-      http::response<boost::beast::http::string_body> res;
 
       Cache::val_type val = server_cache->get(key, size);
       if(val == nullptr){
           std::cout << "not found" << std::endl;
-          return send(not_found(key));
+          return not_found(req, key);
       } else {
           std::cout << "cache["<<key<<"]=" << val << std::endl;
-          res.version(11);   // HTTP/1.1
           res.result(boost::beast::http::status::ok);
-          res.set(boost::beast::http::field::server, BOOST_BEAST_VERSION_STRING);
-
           kv_json kv(key, val);
           std::string json = kv.as_string();
           res.body() = json;
           res.set(boost::beast::http::field::content_type, "json");
           res.content_length(json.size() + 1);
-          res.keep_alive(req.keep_alive());
           res.prepare_payload();
-          return send(std::move(res));
+          return res;
       }
     }
 
@@ -128,16 +115,8 @@ void handle_request(http::request<Body, http::basic_fields<Allocator>>&& req, Se
         size = val_str.length()+1;
         std::cout << "setting...";
         server_cache->set(key, val, size);
-        if(server_cache -> get(key, size) == nullptr or server_cache -> get(key, size)[0] == '\0') {
-            std::cout << "error." << std::endl;
-            return send(server_error("auuuuuugh"));
-        } else {
-            std::cout <<"done" << std::endl;
-        }
         //Now we can create and send the response
-        http::response<boost::beast::http::string_body> res;
         res.set(boost::beast::http::field::content_location, "/" + key_str);
-        res.version(11);   // HTTP/1.1
         //set the appropriate status code based on if a new entry was created
         if(key_created){
             res.result(201);
@@ -147,7 +126,7 @@ void handle_request(http::request<Body, http::basic_fields<Allocator>>&& req, Se
         res.keep_alive(true);
         res.prepare_payload();
         // std::cout << "cache[" << key << "] now equals: " << server_cache -> get(key, size) << std::endl;
-        return send(std::move(res));
+        return res;
     }
 
     //Will send a response for if key was deleted or not found; same effects either way
@@ -156,60 +135,44 @@ void handle_request(http::request<Body, http::basic_fields<Allocator>>&& req, Se
         key_type key = std::string(req.target()).substr(1);
         std::cout << key << "...";
         auto success = server_cache->del(key);
-        http::response<boost::beast::http::string_body> res;
-        res.version(11);   // HTTP/1.1
-        res.set(boost::beast::http::field::server, BOOST_BEAST_VERSION_STRING);
         if(success){
             std::cout << "done" << std::endl;
             res.result(boost::beast::http::status::ok);
         } else {
             std::cout << "error: not found" << std::endl;
-            return send(not_found(req.target()));
+            return not_found(req, key);
         }
         res.keep_alive(req.keep_alive());
         res.prepare_payload();
-        return send(std::move(res));
+        return res;
     }
 
     if(req.method() == http::verb::head)
     {
-        http::response<http::empty_body> res;//No body for head response
-        res.version(11);   // HTTP/1.1
         res.result(http::status::ok);
-        res.set(boost::beast::http::field::server, BOOST_BEAST_VERSION_STRING);
         res.set(boost::beast::http::field::content_type, "application/json");
         res.set(boost::beast::http::field::accept, "application/json");
         res.insert("Space-Used", server_cache->space_used());
-        res.keep_alive(req.keep_alive());
         res.prepare_payload();
-        return send(std::move(res));
+        return res;
     }
 
     if(req.method() == http::verb::post) {
         if(std::string(req.target()) != "/reset"){
-            return send(not_found(req.target()));
+            return not_found(req, std::string(req.target()));
         }
         //Resets the cache and sends back a basic response with string body
         server_cache->reset();
         std::cout << "resetting the cache" << std::endl;
         http::response<boost::beast::http::string_body> res;
-        res.version(11);   // HTTP/1.1
         res.result(boost::beast::http::status::ok);
         res.set(boost::beast::http::field::server, BOOST_BEAST_VERSION_STRING);
         res.body() = "The Cache has been reset";
         res.set(boost::beast::http::field::content_type, "text");
-        res.content_length(25);//counting null terminator
-        res.keep_alive(req.keep_alive());
         res.prepare_payload();
-        return send(std::move(res));
+        return res;
     }
-    http::response<http::string_body> res{http::status::bad_request, req.version()};
-    res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-    res.set(http::field::content_type, "text/html");
-    res.keep_alive(req.keep_alive());
-    res.body() = std::string("Unknown HHTP Request Method");
-    res.prepare_payload();
-    return send(std::move(res));
+    return bad_request(req);
 
 }
 
@@ -217,19 +180,17 @@ class session : public std::enable_shared_from_this<session>
 {
     // This is the C++11 equivalent of a generic lambda.
     // The function object is used to send an HTTP message.
-    struct send_lambda
+    struct helper
     {
         session& self_;
 
-        explicit
-        send_lambda(session& self)
+        explicit helper(session& self)
             : self_(self)
         {
         }
 
         template<bool isRequest, class Body, class Fields>
-        void
-        operator()(http::message<isRequest, Body, Fields>&& msg) const
+        void send(http::message<isRequest, Body, Fields>&& msg) const
         {
             // The lifetime of the message has to extend
             // for the duration of the async operation so
@@ -256,7 +217,7 @@ class session : public std::enable_shared_from_this<session>
     beast::flat_buffer buffer_;
     http::request<http::string_body> req_;
     std::shared_ptr<void> res_;
-    send_lambda lambda_;
+    helper helper_;
     Cache*server_cache_;
 
 public:
@@ -265,7 +226,7 @@ public:
         tcp::socket&& socket,
         Cache* cache)
         : stream_(std::move(socket))
-        , lambda_(*this)
+        , helper_(*this)
     {
         server_cache_ = cache;
     }
@@ -311,7 +272,8 @@ public:
             return fail(ec, "read");
 
         // Send the response
-        handle_request(std::move(req_), lambda_, server_cache_);
+        http::response<http::string_body> res = handle_request(std::move(req_), server_cache_);
+        helper_.send(std::move(res));
     }
 
     void

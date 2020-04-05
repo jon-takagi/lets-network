@@ -19,8 +19,8 @@
 #include <thread>
 #include <vector>
 #include <sstream>
-#include "kv_json.hh"
-#include "listener.hh"
+#include "tcp_listener.hh"
+#include "udp_handler.hh"
 
 namespace beast = boost::beast;         // from <boost/beast.hpp>
 namespace http = beast::http;           // from <boost/beast/http.hpp>
@@ -28,7 +28,6 @@ namespace net = boost::asio;            // from <boost/asio.hpp>
 using tcp = boost::asio::ip::tcp;       // from <boost/asio/ip/tcp.hpp>
 
 //Template function since we may have different types of requests passed in
-
 int main(int ac, char* av[])
 {
     try {
@@ -36,9 +35,10 @@ int main(int ac, char* av[])
         desc.add_options()
             ("help", "produce help message")
             ("maxmem", boost::program_options::value<Cache::size_type>() -> default_value(30), "Maximum memory stored in the cache")//had to change from 10000 to 30 for tests to work
-            ("port,p", boost::program_options::value<unsigned short>() -> default_value(42069),"Port number")
+            ("port,p", boost::program_options::value<unsigned short>() -> default_value(42069),"TCP Port number")
             ("server,s", boost::program_options::value<std::string>() ->default_value("127.0.0.1"),"IPv4 address of the server in dotted decimal")
             ("threads,t", boost::program_options::value<int>()->default_value(1),"Ignored for now")
+            ("udp,u", boost::program_options::value<unsigned short>() ->default_value(42069), "UDP port number")
         ;
         boost::program_options::variables_map vm;
         boost::program_options::store(boost::program_options::parse_command_line(ac, av, desc), vm);
@@ -48,24 +48,35 @@ int main(int ac, char* av[])
             return 0;
         }
         auto const server = boost::asio::ip::make_address(vm["server"].as<std::string>());
-        unsigned short const port = vm["port"].as<unsigned short>();
+        unsigned short const tcp_port = vm["port"].as<unsigned short>();
         int const threads = vm["threads"].as<int>();
         Cache::size_type maxmem = vm["maxmem"].as<Cache::size_type>();
+        unsigned short const udp_port = vm["udp"].as<unsigned short>();
+        bool using_udp = !vm["udp"].defaulted();
 
-        std::cout << "maxmem: "<<maxmem<< "\n";
-        std::cout << "port: " << port << "\n";
-        std::cout << "server: " << server<< "\n";
-        std::cout <<"threads: " << threads << "\n";
+        std::cout << "maxmem: "<< maxmem      << std::endl;
+        std::cout << "server: " << server     << std::endl;
+        std::cout << "threads: " << threads   << std::endl;
+
+        if(using_udp){
+            std::cout << "udp port: " << udp_port << std::endl;
+        } else {
+            std::cout << "tcp port: " << tcp_port << std::endl;
+        }
         if(threads < 0) {
-            std::cerr << "args are wrong - must use >0 threads." << std::endl;
+            std::cerr << "must use >0 threads." << std::endl;
             return 1;
         }
+
         Cache server_cache(maxmem);
         Cache* server_cache_p = &server_cache;
         boost::asio::io_context ioc{threads};
 
-        std::make_shared<listener>(ioc,tcp::endpoint{server, port}, server_cache_p)->run();
-
+        if(using_udp) {
+            std::make_shared<udp_handler>(ioc, server_cache_p, udp_port)->run();
+        } else {
+            std::make_shared<tcp_listener>(ioc, tcp::endpoint{server, tcp_port}, server_cache_p)->run();
+        }
         std::vector<std::thread> v;
         v.reserve(threads - 1);
         for(auto i = threads - 1; i > 0; --i)

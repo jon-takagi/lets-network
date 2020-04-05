@@ -15,7 +15,7 @@ clean:
 	-rm *.o $(objects)
 	-rm *.bin
 
-server.bin: cache_lib.o fifo_evictor.o listener.o
+server.bin: cache_lib.o fifo_evictor.o tcp_listener.o udp_handler.o
 	$(CXX) $(LDFLAGS) cache_server.cc -o $@ $^ /vagrant/systems/boost/lib/libboost_program_options.a
 net_test.bin: cache_client.o fifo_evictor.o
-	$(CXX) $(LDFLAGS) net_test_lib.cc -o $@ $^
+	$(CXX) $(LDFLAGS) test_lib_networked.cc -o $@ $^
