@@ -5,18 +5,17 @@
 #include <boost/asio.hpp>
 #include <boost/beast/http/parser.hpp>
 #include "udp_handler.hh"
-#include "helpers.hh"
-
 
 namespace beast = boost::beast;         // from <boost/beast.hpp>
 namespace http = beast::http;           // from <boost/beast/http.hpp>
 namespace net = boost::asio;            // from <boost/asio.hpp>
 using udp = boost::asio::ip::udp;       // from <boost/asio/ip/udp.hpp>
 
-udp_handler::udp_handler(net::io_context& ioc, udp::endpoint endpoint, Cache* cache):
+udp_handler::udp_handler(net::io_context& ioc, udp::endpoint endpoint, Cache* cache, request_processor rp):
     ioc_(ioc),
     socket_(ioc, endpoint)
 {
+    processor_ = rp;
     server_cache_ = cache;
 }
 void udp_handler::run() {
@@ -35,11 +34,23 @@ void udp_handler::handle_receive(const boost::system::error_code& error, std::si
         std::cout << data << std::endl;
         boost::system::error_code ec;
         http::request_parser<http::string_body> parser;
-        parser.put(boost::asio::buffer(data), ec);
-        http::request<http::string_body> req = parser.get();
 
-        http::response<http::string_body> res = handle_request(req, &server_cache_);
-        boost::shared_ptr<std::string> message (new std::string("world"));
+        std::cout << "sending data to parser...";
+        parser.put(boost::asio::buffer(data), ec);
+        std::cout << "done" << std::endl;
+
+        std::cout << "getting object from parser..." ;
+        http::request<http::string_body> req = parser.get();
+        std::cout << "done" << std::endl;
+
+        std::cout << "processing response" << std::endl;
+        http::response<http::string_body> res = processor_.handle_request(req, server_cache_);
+        std::cout << "done" << std::endl;
+        std::ostringstream oss;
+        oss << res;
+        std::string response_as_string = oss.str();
+
+        boost::shared_ptr<std::string> message(new std::string(response_as_string));
         socket_.async_send_to(boost::asio::buffer(*message), remote_endpoint_,
             boost::bind(&udp_handler::handle_send, shared_from_this(), message,
                 boost::asio::placeholders::error,
@@ -56,6 +67,6 @@ void udp_handler::handle_send(boost::shared_ptr<std::string> message, const boos
         std::cerr << "error code " << error.value() << std::endl;
         std::cerr << "after " << bytes_transferred << " bytes were bytes_transferred" << std::endl;
     } else {
-        std::cout << message << std::endl;
+        std::cout << *message << std::endl;
     }
 }

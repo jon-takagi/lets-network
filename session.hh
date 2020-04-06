@@ -19,7 +19,7 @@
 #include <thread>
 #include <vector>
 #include <sstream>
-#include "helpers.hh"
+#include "request_processor.hh"
 
 namespace beast = boost::beast;         // from <boost/beast.hpp>
 namespace http = beast::http;           // from <boost/beast/http.hpp>
@@ -30,8 +30,7 @@ class session : public std::enable_shared_from_this<session>
 {
     // This is the C++11 equivalent of a generic lambda.
     // The function object is used to send an HTTP message.
-    struct helper
-    {
+    struct helper {
         session& self_;
 
         explicit helper(session& self)
@@ -68,29 +67,25 @@ class session : public std::enable_shared_from_this<session>
     http::request<http::string_body> req_;
     std::shared_ptr<void> res_;
     helper helper_;
+    request_processor processor_;
     Cache*server_cache_;
 
 public:
     // Take ownership of the stream
-    session(
-        tcp::socket&& socket,
-        Cache* cache)
-        : stream_(std::move(socket))
-        , helper_(*this)
+    session( tcp::socket&& socket, Cache* cache, request_processor rp):
+        stream_(std::move(socket)),
+        helper_(*this)
     {
         server_cache_ = cache;
+        processor_ = rp;
     }
 
     // Start the asynchronous operation
-    void
-    run()
-    {
+    void run() {
         do_read();
     }
 
-    void
-    do_read()
-    {
+    void do_read() {
         // Make the request empty before reading,
         // otherwise the operation behavior is undefined.
         req_ = {};
@@ -105,13 +100,8 @@ public:
                 shared_from_this()));
     }
 
-    void
-    on_read(
-        beast::error_code ec,
-        std::size_t bytes_transferred)
-    {
+    void on_read(beast::error_code ec, std::size_t bytes_transferred) {
         boost::ignore_unused(bytes_transferred);
-
         // This means they closed the connection
         if(ec == http::error::end_of_stream){
             std::cout << "end of stream; closing" << std::endl;
@@ -119,10 +109,10 @@ public:
         }
 
         if(ec)
-            return fail(ec, "read");
+            return processor_.fail(ec, "read");
 
         // Send the response
-        http::response<http::string_body> res = handle_request(std::move(req_), server_cache_);
+        http::response<http::string_body> res = processor_.handle_request(std::move(req_), server_cache_);
         helper_.send(std::move(res));
     }
 
@@ -135,7 +125,7 @@ public:
         boost::ignore_unused(bytes_transferred);
 
         if(ec)
-            return fail(ec, "write");
+            return processor_.fail(ec, "write");
 
         if(close)
         {

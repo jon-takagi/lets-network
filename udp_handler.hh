@@ -6,6 +6,7 @@
 #include <boost/array.hpp>
 #include "cache.hh"
 #include <iostream>
+#include "request_processor.hh"
 namespace beast = boost::beast;         // from <boost/beast.hpp>
 namespace http = beast::http;           // from <boost/beast/http.hpp>
 namespace net = boost::asio;            // from <boost/asio.hpp>
@@ -14,9 +15,10 @@ using udp = boost::asio::ip::udp;
 class udp_handler : public std::enable_shared_from_this<udp_handler> {
 net::io_context& ioc_;
 public:
-    udp_handler(net::io_context& ioc, udp::endpoint endpoint, Cache* cache);
+    udp_handler(net::io_context& ioc, udp::endpoint endpoint, Cache* cache, request_processor rp);
     void run();
 private:
+    request_processor processor_;
     Cache* server_cache_;
     udp::endpoint remote_endpoint_;
     udp::socket socket_;
