@@ -25,7 +25,7 @@ std::function<std::size_t(key_type)> bad_hash = [&](key_type k) {
     return 2;
 };
 
-auto test_cache = Cache("127.0.0.1", "42069");
+auto test_cache = Cache("127.0.0.1", "42069", "9001");
 Cache::size_type size; //Need this so we can pass size for the get calls; also is checked in some tests
 
 //Test null entry

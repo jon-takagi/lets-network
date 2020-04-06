@@ -107,10 +107,10 @@ public:
     }
 };
 
-Cache::Cache(std::string host, std::string tcp_port) : pImpl_(new Impl()){ //add std::string udp_port as a param
+Cache::Cache(std::string host, std::string tcp_port, std::string udp_port) : pImpl_(new Impl()){ //add std::string udp_port as a param
     pImpl_->host_ = host;
     pImpl_->tcp_port_ = tcp_port;
-    pImpl_->udp_port_ = tcp_port;
+    pImpl_->udp_port_ = udp_port;
     try{
         //udp
         udp::resolver udp_resolver(pImpl_->ioc_);

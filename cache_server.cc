@@ -39,7 +39,7 @@ int main(int ac, char* av[])
             ("port,p", boost::program_options::value<unsigned short>() -> default_value(42069),"TCP Port number")
             ("server,s", boost::program_options::value<std::string>() ->default_value("127.0.0.1"),"IPv4 address of the server in dotted decimal")
             ("threads,t", boost::program_options::value<int>()->default_value(1),"Ignored for now")
-            ("udp,u", boost::program_options::value<unsigned short>() ->default_value(42069), "UDP port number")
+            ("udp,u", boost::program_options::value<unsigned short>() ->default_value(9001), "UDP port number")
         ;
         boost::program_options::variables_map vm;
         boost::program_options::store(boost::program_options::parse_command_line(ac, av, desc), vm);
@@ -53,15 +53,11 @@ int main(int ac, char* av[])
         int const threads = vm["threads"].as<int>();
         Cache::size_type maxmem = vm["maxmem"].as<Cache::size_type>();
         unsigned short const udp_port = vm["udp"].as<unsigned short>();
-        bool using_udp = !vm["udp"].defaulted();
 
         std::cout << "maxmem: "<< maxmem      << std::endl;
         std::cout << "server: " << server     << std::endl;
         std::cout << "threads: " << threads   << std::endl;
-
-        if(using_udp){
-            std::cout << "udp port: " << udp_port << std::endl;
-        }
+        std::cout << "udp port: " << udp_port << std::endl;
         std::cout << "tcp port: " << tcp_port << std::endl;
         if(threads < 0) {
             std::cerr << "must use >0 threads." << std::endl;
