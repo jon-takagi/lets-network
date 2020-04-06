@@ -76,10 +76,15 @@ public:
             std::string request_string = oss.str();
             udp_socket_ -> send_to(boost::asio::buffer(request_string, request_string.length()), receiver_endpoint_);
             boost::array<char, 1000> recv_buff;
-            size_t len = udp_socket_ -> receive_from(boost::asio::buffer(recv_buff), sender_endpoint_);
+            udp_socket_ -> receive_from(boost::asio::buffer(recv_buff), sender_endpoint_);
             // std::cout.write(recv_buff.data(), len);
-            http::response<http::dynamic_body> res;
-            return res;
+            std::string response_as_string(recv_buff.begin(), recv_buff.end());
+
+            boost::system::error_code ec;
+            boost::beast::http::response_parser<http::dynamic_body> p;
+            p.eager(true);
+            p.put(boost::asio::buffer(response_as_string), ec);
+            return p.get();
             /*
             boost::array<char, 1> send_buf  = {{ 0 }};
             socket_->send_to(boost::asio::buffer(send_buf), receiver_endpoint_);
