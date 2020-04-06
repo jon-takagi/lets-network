@@ -1,7 +1,7 @@
 Jon Takagi and Eli Poppele
 
 ## TCP/UDP Server
-Our server is implemented in `cache_server.cc`, which builds into `server.bin`.
+Our server is implemented in `cache_server.cc`, which builds into `server.bin`. To test our code, we run `server.bin` on one terminal window, and `net_test.bin` in another to test the cache connection to a locally hosted server.
 
 ### Building
 I installed boost into `/usr/local/boost_1_72_0`, then used bootstrap to make a copy in `/vagrant/systems/boost`. In our makefile, these are included in lines 2 and 21. If you install boost elsewhere, or don't use the VM provided by Eitan, then change these lines.
