@@ -16,14 +16,6 @@
 //we do not use an evictor with the cache since we test the basic rejection
 //behavior of the cache here, and then the evictor separately.
 
-//Hash function here is a lambda that always returns 2
-//It also records all of its inputs,
-//So we can check that it is actually getting called
-std::vector<key_type> in_vec;
-std::function<std::size_t(key_type)> bad_hash = [&](key_type k) {
-    in_vec.push_back(k);
-    return 2;
-};
 
 auto test_cache = Cache("127.0.0.1", "42069", "9001");
 Cache::size_type size; //Need this so we can pass size for the get calls; also is checked in some tests

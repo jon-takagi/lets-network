@@ -10,9 +10,9 @@ namespace http = beast::http;           // from <boost/beast/http.hpp>
 
 class request_processor {
 public:
-void fail(boost::beast::error_code ec, char const* what) {
-    std::cerr << what << ": " << ec.message() << "\n";
-}
+    void fail(boost::beast::error_code ec, char const* what) {
+        std::cerr << what << ": " << ec.message() << "\n";
+    }
     http::response<http::string_body> server_error(http::request<http::string_body> req, std::string message) {
         http::response<http::string_body> res{http::status::internal_server_error, req.version()};
         res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
@@ -42,6 +42,8 @@ void fail(boost::beast::error_code ec, char const* what) {
     }
     http::response<http::string_body> handle_request(http::request<http::string_body> req, Cache* server_cache) {
         std::cout << "handling request" << std::endl;
+        std::cout << "\t request method: " << req.method() << std::endl;
+        std::cout << "\t request target: " << req.target() << std::endl;
         if( req.method() != http::verb::get &&
             req.method() != http::verb::put &&
             req.method() != http::verb::delete_ &&

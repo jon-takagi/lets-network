@@ -74,16 +74,10 @@ public:
             std::ostringstream oss;
             oss << req;
             std::string request_string = oss.str();
-            std::cout << "opening...";
-            udp_socket_ -> open(udp::v4());
-            std::cout << "done" << std::endl;
-            std::cout << "sending...";
-            std::cout << request_string << std::endl;
             udp_socket_ -> send_to(boost::asio::buffer(request_string, request_string.length()), receiver_endpoint_);
-            std::cout << "done" << std::endl;
-            boost::array<char, 128> recv_buff;
+            boost::array<char, 1000> recv_buff;
             size_t len = udp_socket_ -> receive_from(boost::asio::buffer(recv_buff), sender_endpoint_);
-            std::cout.write(recv_buff.data(), len);
+            // std::cout.write(recv_buff.data(), len);
             http::response<http::dynamic_body> res;
             return res;
             /*
@@ -138,6 +132,7 @@ Cache::~Cache() {
     reset();
     beast::error_code ec;
     pImpl_->tcp_stream_->socket().shutdown(tcp::socket::shutdown_both, ec);
+    pImpl_->udp_socket_->close();
     delete pImpl_->tcp_stream_;
     delete pImpl_->udp_socket_;
     //if(ec && ec != beast::errc::not_connected) throw beast::system_error{ec};

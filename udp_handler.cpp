@@ -29,14 +29,17 @@ void udp_handler::start_recieve() {
 }
 void udp_handler::handle_receive(const boost::system::error_code& error, std::size_t bytes_transferred) {
     if(!error) {
-        std::cout << "recieved message:" << std::endl;
+        std::cout << "recieved request:" << std::endl;
         std::string data(recv_buffer_.begin(), recv_buffer_.end());
         std::cout << data << std::endl;
+        std::string s = "GET /key_one/ HTTP/1.1";
+        std::cout << s.compare(data) << std::endl;
         boost::system::error_code ec;
         http::request_parser<http::string_body> parser;
-
+        parser.eager(true);
         std::cout << "sending data to parser...";
         parser.put(boost::asio::buffer(data), ec);
+        // parser.put_eof(ec);
         std::cout << "done" << std::endl;
 
         std::cout << "getting object from parser..." ;
@@ -49,6 +52,7 @@ void udp_handler::handle_receive(const boost::system::error_code& error, std::si
         std::ostringstream oss;
         oss << res;
         std::string response_as_string = oss.str();
+        std::cout << response_as_string << std::endl;
 
         boost::shared_ptr<std::string> message(new std::string(response_as_string));
         socket_.async_send_to(boost::asio::buffer(*message), remote_endpoint_,
@@ -69,4 +73,5 @@ void udp_handler::handle_send(boost::shared_ptr<std::string> message, const boos
     } else {
         std::cout << *message << std::endl;
     }
+    start_recieve();
 }
