@@ -1,6 +1,6 @@
 Jon Takagi and Eli Poppele
 
-## TCP Server
+## TCP/UDP Server
 Our server is implemented in `cache_server.cc`, which builds into `server.bin`.
 
 ### Building
@@ -10,16 +10,18 @@ Note that in our makefile we only specify `program_options` to the linker. This 
 
 ### Command Line Args
 
-Valid arguments are -m --maxmem, -s --server, -p --port, and -t --threads. Passing --help will list the arguments. All of these arguments are optional, and their default values are:
-| Maxmem | Server      | Port  | Threads |
-|--------|-------------|-------|---------|
-|     30 | "127.0.0.1" | 42069 | 1       |
+Valid arguments are -m --maxmem, -s --server, -p --port, -u --udp, and -t --threads. Passing --help will list the arguments. All of these arguments are optional, and their default values are:
+| Maxmem | Server      | Port  | UDP  | Threads |
+|--------|-------------|-------|------|---------|
+|     30 | "127.0.0.1" | 42069 | 9001 | 1       |
 
 Maxmem is measured in bytes. The default was selected to match the values we used in previous tests, and must be set for any serious use. However, we expect this code to be tested more than used, so the default matches the tests.
 
 Server is the hostname of the machine being used to host. Using localhost allows us to test it internally, and determining the right IP for a production host is beyond the scope of our program.
 
-Port is the TCP port to listen on. Any port between 1024 and 49151 is a "user" port, and no other common applications use this point, according to [wikipedia](https://en.wikipedia.org/wiki/List_of_TCP_and_UDP_port_numbers). The precise number was chosen randomly from [1024,49151], and after consulting Eitan, we decided not to use a dynamic port number.
+Port is the TCP port to listen on. Any port between 1024 and 49151 is a "user" port, and no other common applications use this point, according to [wikipedia](https://en.wikipedia.org/wiki/List_of_TCP_and_UDP_port_numbers). The precise number was chosen randomly from [1024,49151], and after consulting Eitan, we decided not to use a dynamic port number. 
+
+UDP is the udp port to listen on. 9001 was similarly selected as an unused and entirely arbitrary port to use.
 
 Threads is the number of CPU threads used to run our code. It defaults to 1, and debugging multithreading bugs is outside the scope of this assignment. If a value less than 1 is passed, the server throws an error.
 ### Architecture
@@ -46,14 +48,17 @@ To respond to a HEAD request, we call the `space_used` function on the cache. We
 #### POST
 The POST request is used to reset the cache, so we ensure that the target is `"/reset"`. We then reset the underlying cache, then send a 200 OK response to notify the user that the cache has successfully been reset.
 ## TCP Client
-`cache_client.cc` is an implementation of the API defined in `cache.hh` that connects to a cache_server over TCP. It defines the 4 methods defined in the header, as detailed below, as well as an internal method `send`, which takes an http::request, sends it to the server, and returns any response it receives. This function is a helper that helps reduce code duplication.
+`cache_client.cc` is an implementation of the API defined in `cache.hh` that connects to a cache_server over both TCP and UDP. It defines the 4 methods defined in the header, as detailed below, as well as a pair of internal `send` methods, which both take an http::request, send it to the server, and return any response it receives. These functions are helpers that reduce code duplication. `send_tcp` is our standard send method for most of the functions, while `send_udp` is used only for GET.
 For the issue of pointer ownership in the return on GET in the client, we extracted the JSON data from the http response using the JSON class. This gave us a value as a cstring pointer; however, using that value would not work since the data is owned by the JSON object (which is deleted at the end of the function) and memcpy also doesn't work in the case of a const pointer (which is what val type is). The hacky solution we used was to create a string as a conversion of the JSON value, then create the val_type in one step using that string in the cstring constructor; this results in the return value pointing to its own copy of the data while the JSON value, now a duplicate, is then deleted.
 ### constructor / destructor
-The constructor takes a host address and port number as parameters, both as `std::string`s. It then resolves the address using the beast `resolver` class, and saves the results for later use by `send`.
-### send
+The constructor takes a host address and two port numbers as parameters, all as `std::string`s. It then resolves the address using the beast `resolver` class, and saves the results for later use by `send`.
+### send_tcp
 This method constructs a `tcp_stream`, then connects it to the endpoints resolved during the construction of the client. It sends the message it was passed. If an error occurs, it returns a response with a 499 error code and the `what` of the error.
 
 Otherwise, it reads in the response, parses it into a `beast::http::response` object. After closing the connection, it returns the response object.
+
+### send_udp
+To be most compatible with our existing GET code, and to maintain that code in its current state so that we can easily switch from using UDP or TCP for get, the `send_udp` function has the same parameters and return type as the `send_tcp` function. 
 ### prep_req
 This method takes an `http::verb` and a target, as an `std::string`. It constructs a request object with the given method and target.
 The host is the same as the host being connected to, the agent is the `BOOST_BEAST_VERSION_STRING`, and we use HTTP version 1.1
@@ -67,3 +72,6 @@ Each of these methods constructs an `http::request<string_body>` with default ho
 | `reset`| /reset   | POST   |  
 
 To avoid the "unused parameter" warning, the `set` method increments the `size` argument it is passed. We considered printing it instead, but that cluttered up our test results.
+
+## TCP/UDP Testing
+We included a test file `get_test.cc` which will run 1000 tests of GET and reports the minimum time from 20 trials of the test. The test simply uses the default behavior of the cache/server, so to test TCP we ran the test on the old code without UDP implementation. This yielded average times of about 101 ms for 1000 calls to a locally hosted server. Running the test on our new and functional UDP code, we found times were now about
