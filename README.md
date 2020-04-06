@@ -58,7 +58,7 @@ This method constructs a `tcp_stream`, then connects it to the endpoints resolve
 Otherwise, it reads in the response, parses it into a `beast::http::response` object. After closing the connection, it returns the response object.
 
 ### send_udp
-To be most compatible with our existing GET code, and to maintain that code in its current state so that we can easily switch from using UDP or TCP for get, the `send_udp` function has the same parameters and return type as the `send_tcp` function. 
+To be most compatible with our existing GET code, and to maintain that code in its current state so that we can easily switch from using UDP or TCP for get, the `send_udp` function has the same parameters and return type as the `send_tcp` function. We process the string request from the parameter and load it into a buffer so that we can send it over the socket, and once we receive a response, we use a parser to turn the response back into an appropriately-formatted http message.
 ### prep_req
 This method takes an `http::verb` and a target, as an `std::string`. It constructs a request object with the given method and target.
 The host is the same as the host being connected to, the agent is the `BOOST_BEAST_VERSION_STRING`, and we use HTTP version 1.1
@@ -74,4 +74,4 @@ Each of these methods constructs an `http::request<string_body>` with default ho
 To avoid the "unused parameter" warning, the `set` method increments the `size` argument it is passed. We considered printing it instead, but that cluttered up our test results.
 
 ## TCP/UDP Testing
-We included a test file `get_test.cc` which will run 1000 tests of GET and reports the minimum time from 20 trials of the test. The test simply uses the default behavior of the cache/server, so to test TCP we ran the test on the old code without UDP implementation. This yielded average times of about 101 ms for 1000 calls to a locally hosted server. Running the test on our new and functional UDP code, we found times were now about
+We included a test file `get_test.cc` which will run 1000 tests of GET and reports the minimum time from 20 trials of the test. The test simply uses the default behavior of the cache/server, so to test TCP we ran the test on the old code without UDP implementation. This yielded average times of about 101 ms for 1000 calls to a locally hosted server. Running the test on our new and functional UDP code, we found times were now about 107 ms for 100 calls. I suspect that things may work somewhat differently in the case of a nonlocal server, as UDP should be faster once ping is a significant factor in the time it takes a request to process.
