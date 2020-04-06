@@ -75,7 +75,7 @@ public:
             oss << req;
             std::string request_string = oss.str();
             std::cout << "opening...";
-            udp_socket_ -> open(udp::v4());
+            //udp_socket_ -> open(udp::v4());
             std::cout << "done" << std::endl;
             std::cout << "sending...";
             std::cout << request_string << std::endl;
@@ -86,16 +86,6 @@ public:
             std::cout.write(recv_buff.data(), len);
             http::response<http::dynamic_body> res;
             return res;
-            /*
-            boost::array<char, 1> send_buf  = {{ 0 }};
-            socket_->send_to(boost::asio::buffer(send_buf), receiver_endpoint_);
-            boost::array<char, 128> recv_buf;
-            socket_->receive_from(boost::asio::buffer(recv_buf), sender_endpoint_);
-            beast::flat_buffer buffer;
-            http::response<http::dynamic_body> res;
-            http::read(recv_buf.data(), buffer, res);
-            return res;
-            */
         }
         catch(std::exception const& e){
             std::cerr << "Error: " << e.what() << std::endl;
@@ -138,6 +128,7 @@ Cache::~Cache() {
     reset();
     beast::error_code ec;
     pImpl_->tcp_stream_->socket().shutdown(tcp::socket::shutdown_both, ec);
+    pImpl_->udp_socket_->close();
     delete pImpl_->tcp_stream_;
     delete pImpl_->udp_socket_;
     //if(ec && ec != beast::errc::not_connected) throw beast::system_error{ec};
