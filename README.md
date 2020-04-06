@@ -25,18 +25,17 @@ UDP is the udp port to listen on. 9001 was similarly selected as an unused and e
 
 Threads is the number of CPU threads used to run our code. It defaults to 1, and debugging multithreading bugs is outside the scope of this assignment. If a value less than 1 is passed, the server throws an error.
 ### Architecture
-The server consists of 2 classes,`listener` and `session`, and 2 methods - `handle_request` and `main`. The use of classes allows our server to run asynchronously, although in this case we only test and run a single thread. We consulted Boost documentation and example code to understand how to create this basic structure for an async server and synchronous client. 
+The server consists of a `main` function in its own file, and imports three classes- `tcp_listener`, `udp_handler`, and `request_processor`. The use of classes allows our server to run asynchronously, although in this case we only test and run a single thread. We consulted Boost documentation and example code to understand how to create this basic structure for an async server and synchronous client. 
 
 #### `main`
-The main method parses the command line arguments using `boost::program_options`. First, it creates a `Cache` object using the specified max memory (The other cache parameters are left as default). It then creates a single listener on the specified endpoint, and orders it to run. Finally, it prepares the specified number of threads to be used by the io_context, which allows our code to run on multiple threads.
-#### `listener`
-The listener waits for new clients to open connections. When it does, it creates a new `session`, then returns to listening for clients. This allows a single server to communicate with many clients at once. This class is almost entirely identical to the example given in the boost examples as `http_server_async.cpp`, but it takes a `Cache*` in its constructor, and passes it to each session it creates.
-
-#### `session`
-The `session` class handles a single client at a time. It first creates a `tcp_stream` from the socket assigned to it by the `listener`. It ensures that properly formed HTTP requests are parsed into beast request objects, then passes them to `handle_request`, which is where the majority of our original code is. It also ensures the pointer to the Cache object is passed alongside the request. Finally, the session object gracefully closes the connection at the end of communication.
-
+The main method parses the command line arguments using `boost::program_options`. First, it creates a `Cache` object using the specified max memory (The other cache parameters are left as default). It then creates a single listener for TCP and UDP each on the specified endpoint, and orders it to run. Finally, it prepares the specified number of threads to be used by the io_context, which allows our code to run on multiple threads.
+#### `tcp_listener`
+The listener waits for new clients to open connections. When it does, it accepts the connection and creates a strand for it, then returns to listening for clients. This allows a single server to communicate with many clients at once. This class is very similar to the example given in the boost examples as `http_server_async.cpp`, but it takes a `Cache*` in its constructor, and has the equivalent `session` function built in implicitly, as we found such an integration to work well for our purposes.
+#### `udp_handler`
+The `udp_handler` is relatively simple since it doesn't have to handle sessions for different clients. The code listens for a request, processes it into an http request, and then calls `handle_request` on the instance. Afterwards, it converts the http response back into an appropriate UDP response, and flings that out into the void of the internet.
 #### `handle_request`
-This method takes a beast request object, a function to send them, and a pointer to the cache object created by main. It first validates that the request method is one of GET, PUT, DELETE, HEAD, or POST. If not, it replies with a bad_request response.
+This method takes a beast request object, a function to send them, and a pointer to the cache object created by main. It first validates that the request method is one of GET, PUT, DELETE, HEAD, or POST. If not, it replies with a bad_request response. Given that we do http conversion in our `udp_handler`, this function is unchanged from our TCP implementation and is used in both the TCP and UDP parts of the server.
+
 #### GET
 To respond to a GET request, it first parses the key and attempts to `get` it from the cache. If the cache returns a nullptr, then it sends a 404 response. Otherwise, it uses the `kv_json` class to create a json string from the requested key and returned value, sets that as the body of the response, and sends it.
 #### PUT
