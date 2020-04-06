@@ -43,7 +43,11 @@ class Cache {
         hash_func hasher = std::hash<key_type>());
 
   // Create a new Cache networked client with a given host and port.
+<<<<<<< HEAD
   Cache(std::string host = "127.0.0.1", std::string tcp_port = "42069", std::string udp_port = "9001");
+=======
+  Cache(std::string host, std::string tcp_port, unsigned short udp_port=50000);
+>>>>>>> e674f2ed9ae18db5ad353ef3a636e734772e2d9a
 
   ~Cache();
 

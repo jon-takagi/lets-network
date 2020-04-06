@@ -13,6 +13,7 @@
 #include <boost/property_tree/json_parser.hpp>
 #include "cache.hh"
 #include "kv_json.hh"
+#include <boost/array.hpp>
 //
 namespace beast = boost::beast;     // from <boost/beast.hpp>
 namespace http = beast::http;       // from <boost/beast/http.hpp>
@@ -44,6 +45,7 @@ public:
         req.prepare_payload();
         return req;
     }
+
 
     http::response<http::dynamic_body> send_tcp(http::request<http::string_body> req) {
         try{
@@ -151,6 +153,7 @@ void Cache::set(key_type key, val_type val, size_type size) {
 //it tcp compatible again easily
 Cache::val_type Cache::get(key_type key, size_type& val_size) const{
     //GET /key
+
     http::request<http::string_body> req = pImpl_->prep_req(http::verb::get, "/"+key, pImpl_->udp_port_);
     http::response<http::dynamic_body> res = pImpl_->send_udp(req);
     if(res.result() == http::status::not_found){
