@@ -2,7 +2,6 @@
 #include "evictor.hh"
 #include <list>           // std::list
 #include <queue>
-#include <iostream>
 FifoEvictor::FifoEvictor() {
 
 }
