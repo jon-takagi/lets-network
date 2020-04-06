@@ -1,7 +1,7 @@
 Jon Takagi and Eli Poppele
 
 ## TCP Server
-Our server is implemented in `cache_server.cc`, which builds into `server.bin`.
+Our server is implemented in `cache_server.cc`, which builds into `server.bin`. This master branch holds the current functional build of the TCP server, which can be tested with the included `net_tes.bin` file. Our current progress on the extra credit appears on the UDP branch, as the work is not yet fully functional.
 
 ### Building
 I installed boost into `/usr/local/boost_1_72_0`, then used bootstrap to make a copy in `/vagrant/systems/boost`. In our makefile, these are included in lines 2 and 21. If you install boost elsewhere, or don't use the VM provided by Eitan, then change these lines.
