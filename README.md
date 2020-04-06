@@ -57,7 +57,7 @@ This method constructs a `tcp_stream`, then connects it to the endpoints resolve
 Otherwise, it reads in the response, parses it into a `beast::http::response` object. After closing the connection, it returns the response object.
 
 ### send_udp
-To be most compatible with our existing GET code, and to maintain that code in its current state so that we can easily switch from using UDP or TCP for get, the `send_udp` function has the same parameters and return type as the `send_tcp` function. We process the string request from the parameter and load it into a buffer so that we can send it over the socket, and once we receive a response, we use a parser to turn the response back into an appropriately-formatted http message.
+To be most compatible with our existing GET code, and to maintain that code in its current state so that we can easily switch from using UDP or TCP for get, the `send_udp` function has the same parameters and return type as the `send_tcp` function. We process the string request from the parameter and load it into a buffer so that we can send it over the socket, and once we receive a response, we use a parser to turn the response back into an appropriately-formatted http message. This method currently lacks a timeout which the assignment said we should have.
 ### prep_req
 This method takes an `http::verb` and a target, as an `std::string`. It constructs a request object with the given method and target.
 The host is the same as the host being connected to, the agent is the `BOOST_BEAST_VERSION_STRING`, and we use HTTP version 1.1
